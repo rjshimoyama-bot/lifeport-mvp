@@ -35,7 +35,7 @@ export function seedQuotes(params: {
         price: Math.max(52000, round(price)),
         crew: idx <= 1 ? 2 : 3,
         boxes: 25 + idx * 5,
-        insurance: idx === 1 ? "簡易" : "あり",
+        insurance: (idx === 1 ? "簡易" : "あり") as const,
         hint: params.window !== "0" && i === 1 ? "既存ルートに組み込める可能性があり価格が抑えられています" : undefined
       };
     });
@@ -68,4 +68,5 @@ function round(n: number) {
 function jitter(a: number, b: number) {
   const x = (a + 1) * 971 + (b + 3) * 433;
   return (x % 7) * 350;
+
 }
