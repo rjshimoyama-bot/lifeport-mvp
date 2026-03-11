@@ -29,15 +29,16 @@ export function seedQuotes(params: {
       const timebandDelta = params.timeband === "all" ? -3000 : 0;
       const price = base + companyDelta + timebandDelta + efficiencyBoost + jitter(idx, i);
 
-      return {
-        id: `${c.id}-${i}`,
-        label,
-        price: Math.max(52000, round(price)),
-        crew: idx <= 1 ? 2 : 3,
-        boxes: 25 + idx * 5,
-        insurance: idx === 1 ? "簡易" : "あり",
-        hint: params.window !== "0" && i === 1 ? "既存ルートに組み込める可能性があり価格が抑えられています" : undefined
-      };
+      const insurance: "あり" | "簡易" | "なし" = idx === 1 ? "簡易" : "あり";
+     return {
+  id: `${c.id}-${i}`,
+  label,
+  price: Math.max(52000, round(price)),
+  crew: idx <= 1 ? 2 : 3,
+  boxes: 25 + idx * 5,
+  insurance,
+  hint: params.window !== "0" && i === 1 ? "既存ルートに組み込める可能性があり価格が抑えられています" : undefined
+};
     });
 
     const basePriceMin = Math.min(...options.map((o) => o.price));
@@ -70,5 +71,6 @@ function jitter(a: number, b: number) {
   return (x % 7) * 350;
 
 }
+
 
 
