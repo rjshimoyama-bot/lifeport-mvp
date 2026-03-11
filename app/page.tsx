@@ -37,7 +37,7 @@ export default function Page() {
   return (
     <div className="mx-auto max-w-[960px] px-4 py-10">
       <div className="mb-6 flex items-center justify-between">
-        <div className="text-navy font-semibold text-lg">LifePort</div>
+        <div className="text-navy font-semibold text-lg">Movis（ムーヴィズ）</div>
         <Link className="text-sm text-muted hover:underline" href="/signup">
           はじめる
         </Link>
