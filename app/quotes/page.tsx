@@ -14,17 +14,26 @@ export default function QuotesPage() {
   const [bundles, setBundles] = useState<QuoteBundle[]>([]);
 
   useEffect(() => {
-    const primaryDate = localStorage.getItem("lp_primaryDate") || new Date().toISOString().slice(0, 10);
-    const window = (localStorage.getItem("lp_window") as any) || "3";
-    const timeband = (localStorage.getItem("lp_timeband") as any) || "all";
-  
-    setBundles(seedQuotes({ primaryDate, window, timeband }));
+    const primaryDate =
+      localStorage.getItem("lp_primaryDate") ||
+      new Date().toISOString().slice(0, 10);
+
+    const windowValue =
+      (localStorage.getItem("lp_window") as "0" | "3" | "7" | "wk") || "3";
+
+    const timeband =
+      (localStorage.getItem("lp_timeband") as "am" | "pm" | "all") || "all";
+
+    setBundles(seedQuotes({ primaryDate, window: windowValue, timeband }));
   }, []);
 
   const sorted = useMemo(() => {
     const copy = [...bundles];
-    if (sort === "recommended") copy.sort((a, b) => (b.rating - a.rating) || (a.basePriceMin - b.basePriceMin));
-    else copy.sort((a, b) => a.basePriceMin - b.basePriceMin);
+    if (sort === "recommended") {
+      copy.sort((a, b) => (b.rating - a.rating) || (a.basePriceMin - b.basePriceMin));
+    } else {
+      copy.sort((a, b) => a.basePriceMin - b.basePriceMin);
+    }
     return copy;
   }, [bundles, sort]);
 
@@ -37,134 +46,205 @@ export default function QuotesPage() {
   }, [bundles, selected]);
 
   return (
-    <div className="mx-auto max-w-[960px] px-4 py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <Link href="/" className="text-navy font-semibold text-lg">LifePort</Link>
-        <span className="text-sm text-muted">見積比較</span>
-      </div>
+    <main className="min-h-screen bg-bg">
+      <div className="mx-auto max-w-[1120px] px-4 py-6 md:px-6 md:py-8">
+        <header className="flex items-center justify-between">
+          <Link href="/" className="text-2xl font-bold tracking-tight text-navy">
+            Movis
+          </Link>
+          <span className="text-sm text-muted">見積比較</span>
+        </header>
 
-      <div className="rounded-xl border border-border bg-white p-6 shadow-soft">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-navy text-xl font-semibold">見積比較（会社×日程）</h1>
-            <p className="mt-2 text-sm text-muted">
-              同一社でも日程で価格が変わる場合があります。価格だけでなく条件・評価も確認できます。
-            </p>
-          </div>
+        <section className="mt-8">
+          <div className="rounded-2xl border border-border bg-white p-6 shadow-soft md:p-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="max-w-2xl">
+                <h1 className="text-2xl font-bold text-navy md:text-3xl">
+                  複数社の見積もりを比較
+                </h1>
+                <p className="mt-3 text-sm leading-6 text-muted md:text-base">
+                  同じ引越会社でも、日程によって価格が変わることがあります。
+                  価格だけでなく、条件や対応内容も比較して選べます。
+                </p>
+              </div>
 
-          <button
-            className="text-sm text-muted hover:underline"
-            onClick={() => setSort((v) => (v === "recommended" ? "price" : "recommended"))}
-          >
-            並び替え：{sort === "recommended" ? "おすすめ順" : "価格順"}
-          </button>
-        </div>
+              <button
+                className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-medium text-navy hover:bg-bg"
+                onClick={() => setSort((v) => (v === "recommended" ? "price" : "recommended"))}
+              >
+                並び替え：{sort === "recommended" ? "おすすめ順" : "価格順"}
+              </button>
+            </div>
 
-        <div className="mt-6 space-y-4">
-          {sorted.map((b) => (
-            <QuoteCard key={b.company.id} bundle={b} onChoose={(companyId, optionId) => setSelected({ companyId, optionId })} />
-          ))}
-        </div>
+            <div className="mt-5 rounded-xl border border-cyan/30 bg-cyan/10 p-4">
+              <div className="text-sm font-semibold text-navy">Movis AI 査定</div>
+              <div className="mt-2 grid gap-3 md:grid-cols-4">
+                <AiStat title="荷物量" value="標準〜やや多め" />
+                <AiStat title="想定作業人数" value="2名" />
+                <AiStat title="想定トラック" value="2tクラス" />
+                <AiStat title="想定価格帯" value="7〜8万円台" />
+              </div>
+              <p className="mt-3 text-xs leading-5 text-muted">
+                日程に柔軟性があるため、ルート効率のよい候補では価格が抑えられる可能性があります。
+              </p>
+            </div>
 
-        {chosen && (
-          <div className="mt-6 rounded-xl border border-cyan/30 bg-cyan/10 p-4 text-sm text-navy">
-            選択中：<b>{chosen.b.company.name}</b> ／ <b>{chosen.o.label}</b> ／ <b>{formatJPY(chosen.o.price)}</b>
-            <div className="mt-2 text-muted">
-              （この後、チャット→成約確認→タスク管理へ接続する想定）
+            <div className="mt-8 space-y-5">
+              {sorted.map((b, index) => (
+                <QuoteCard
+                  key={b.company.id}
+                  bundle={b}
+                  rank={index}
+                  onChoose={(companyId, optionId) => setSelected({ companyId, optionId })}
+                />
+              ))}
+            </div>
+
+            {chosen && (
+              <div className="mt-8 rounded-2xl border border-cyan/30 bg-cyan/10 p-5">
+                <div className="text-sm font-semibold text-navy">選択中の見積もり</div>
+                <div className="mt-2 text-lg font-bold text-navy">
+                  {chosen.b.company.name} / {chosen.o.label} / {formatJPY(chosen.o.price)}
+                </div>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  このまま次の画面で、チャット確認や契約フローにつなげられます。
+                </p>
+              </div>
+            )}
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                className="inline-flex h-12 items-center justify-center rounded-lg border border-border bg-white px-5 text-sm font-semibold text-navy hover:bg-bg"
+                href="/progress"
+              >
+                戻る
+              </Link>
+              <Link
+                className="inline-flex h-12 items-center justify-center rounded-lg border border-navy bg-white px-5 text-sm font-semibold text-navy hover:bg-bg"
+                href="/chat"
+              >
+                チャットへ
+              </Link>
             </div>
           </div>
-        )}
-
-        <div className="mt-6 flex gap-3">
-          <Link className="inline-flex h-12 items-center justify-center rounded-lg px-4 text-sm font-medium text-navy hover:bg-bg" href="/progress">
-            戻る
-          </Link>
-          <Link className="inline-flex h-12 items-center justify-center rounded-lg border border-navy bg-white px-4 text-sm font-medium text-navy hover:bg-bg" href="/chat">
-            チャット（次で実装）
-          </Link>
-        </div>
+        </section>
       </div>
+    </main>
+  );
+}
+
+function AiStat({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/60 bg-white p-3">
+      <div className="text-xs text-muted">{title}</div>
+      <div className="mt-1 text-sm font-semibold text-navy">{value}</div>
     </div>
   );
 }
 
 function QuoteCard({
   bundle,
-  onChoose
+  rank,
+  onChoose,
 }: {
   bundle: QuoteBundle;
+  rank: number;
   onChoose: (companyId: string, optionId: string) => void;
 }) {
   const [active, setActive] = useState(bundle.options[0]?.id ?? "");
   const option = bundle.options.find((o) => o.id === active) ?? bundle.options[0];
 
+  const tag =
+    rank === 0
+      ? { label: "おすすめ", style: "border-cyan/30 bg-cyan/10 text-navy" }
+      : bundle.basePriceMin === option.price
+      ? { label: "最安候補", style: "border-green-300 bg-green-50 text-green-700" }
+      : null;
+
   return (
-    <div className="rounded-xl border border-border bg-white p-5 shadow-soft">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="rounded-2xl border border-border bg-white p-5 shadow-soft">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <div className="text-navy font-semibold">{bundle.company.name}</div>
-          <div className="text-xs text-muted">評価：★{bundle.rating.toFixed(1)} ／ {bundle.company.note}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-xl font-bold text-navy">{bundle.company.name}</div>
+            {tag && (
+              <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${tag.style}`}>
+                {tag.label}
+              </span>
+            )}
+          </div>
+          <div className="mt-2 text-sm text-muted">
+            評価：★{bundle.rating.toFixed(1)} ／ {bundle.company.note}
+          </div>
         </div>
-        <div className="text-sm text-muted">
-          最低価格：<span className="text-navy font-semibold">{formatJPY(bundle.basePriceMin)}</span>
+
+        <div className="rounded-xl border border-border bg-bg p-4 md:min-w-[220px]">
+          <div className="text-xs text-muted">この会社の最低価格</div>
+          <div className="mt-1 text-2xl font-bold text-navy">{formatJPY(bundle.basePriceMin)}</div>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {bundle.options.map((o) => {
-          const isActive = o.id === active;
-          return (
-            <button
-              key={o.id}
-              onClick={() => setActive(o.id)}
-              className={[
-                "rounded-lg border px-3 py-2 text-left text-sm transition",
-                isActive ? "border-cyan bg-[#E0F2FE] text-navy" : "border-border bg-white text-muted hover:bg-bg"
-              ].join(" ")}
-            >
-              <div className="font-medium">{o.label}</div>
-              <div className={"text-xs " + (isActive ? "text-navy" : "text-muted")}>{formatJPY(o.price)}</div>
-            </button>
-          );
-        })}
+      <div className="mt-5 overflow-x-auto">
+        <div className="flex min-w-max gap-2">
+          {bundle.options.map((o) => {
+            const isActive = o.id === active;
+            return (
+              <button
+                key={o.id}
+                onClick={() => setActive(o.id)}
+                className={[
+                  "min-w-[140px] rounded-xl border px-4 py-3 text-left transition",
+                  isActive
+                    ? "border-cyan bg-[#E0F2FE] text-navy"
+                    : "border-border bg-white text-muted hover:bg-bg"
+                ].join(" ")}
+              >
+                <div className="text-sm font-semibold">{o.label}</div>
+                <div className={`mt-1 text-sm ${isActive ? "text-navy" : "text-muted"}`}>
+                  {formatJPY(o.price)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="mt-4 grid gap-2 md:grid-cols-3 text-sm">
-        <div className="rounded-lg border border-border bg-bg p-3">
-          <div className="text-muted text-xs">作業員</div>
-          <div className="text-navy font-semibold">{option.crew}名</div>
-        </div>
-        <div className="rounded-lg border border-border bg-bg p-3">
-          <div className="text-muted text-xs">ダンボール</div>
-          <div className="text-navy font-semibold">{option.boxes}箱</div>
-        </div>
-        <div className="rounded-lg border border-border bg-bg p-3">
-          <div className="text-muted text-xs">保険</div>
-          <div className="text-navy font-semibold">{option.insurance}</div>
-        </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        <InfoBox title="作業員" value={`${option.crew}名`} />
+        <InfoBox title="ダンボール" value={`${option.boxes}箱`} />
+        <InfoBox title="保険" value={option.insurance} />
+        <InfoBox title="AI評価" value="条件良好" />
       </div>
 
       {option.hint && (
-        <div className="mt-3 text-xs text-muted">
-          <span className="inline-block rounded-full border border-cyan/30 bg-cyan/10 px-2 py-0.5 text-navy">ヒント</span>{" "}
+        <div className="mt-4 rounded-xl border border-cyan/30 bg-cyan/10 p-4 text-sm leading-6 text-navy">
           {option.hint}
         </div>
       )}
 
-      <div className="mt-4 flex gap-2 flex-wrap">
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <button
-          className="inline-flex h-12 items-center justify-center rounded-lg border border-navy bg-white px-4 text-sm font-medium text-navy hover:bg-bg"
-          onClick={() => alert("詳細は次フェーズ（Overlay想定）")}
+          className="inline-flex h-12 items-center justify-center rounded-lg border border-border bg-white px-5 text-sm font-semibold text-navy hover:bg-bg"
+          onClick={() => alert("詳細表示は次フェーズで追加予定です。")}
         >
-          詳細（デモ）
+          詳細を見る
         </button>
         <button
-          className="inline-flex h-12 items-center justify-center rounded-lg bg-cyan px-4 text-sm font-medium text-white hover:bg-[#0891B2]"
+          className="inline-flex h-12 items-center justify-center rounded-lg bg-cyan px-5 text-sm font-semibold text-white hover:bg-[#0891B2]"
           onClick={() => onChoose(bundle.company.id, option.id)}
         >
-          この日程で決定
+          この日程で選ぶ
         </button>
       </div>
+    </div>
+  );
+}
+
+function InfoBox({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-bg p-4">
+      <div className="text-xs text-muted">{title}</div>
+      <div className="mt-1 text-sm font-semibold text-navy">{value}</div>
     </div>
   );
 }
