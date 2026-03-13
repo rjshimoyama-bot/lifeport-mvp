@@ -1,58 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
+
+type SelectedQuote = {
+  company: string;
+  plan: string;
+  price: string;
+  crew: string;
+  truck: string;
+  insurance: string;
+  note: string;
+};
 
 export default function ConfirmPage() {
-  const selectedQuote = useMemo(() => {
-  if (typeof window === "undefined") {
-    return {
-      company: "未選択",
-      plan: "-",
-      price: "-",
-      crew: "-",
-      truck: "-",
-      insurance: "-",
-      note: "見積もり内容を確認してください。",
-    };
-  }
+  const [selectedQuote, setSelectedQuote] = useState<SelectedQuote>({
+    company: "未選択",
+    plan: "-",
+    price: "-",
+    crew: "-",
+    truck: "-",
+    insurance: "-",
+    note: "見積もり内容を確認してください。",
+  });
 
-  const saved = localStorage.getItem("movis_selected_quote");
-  if (!saved) {
-    return {
-      company: "未選択",
-      plan: "-",
-      price: "-",
-      crew: "-",
-      truck: "-",
-      insurance: "-",
-      note: "見積もり内容を確認してください。",
-    };
-  }
+  useEffect(() => {
+    const saved = localStorage.getItem("movis_selected_quote");
+    if (!saved) return;
 
-  try {
-    const parsed = JSON.parse(saved);
-    return {
-      company: parsed.company || "未選択",
-      plan: parsed.plan || "-",
-      price: parsed.price || "-",
-      crew: parsed.crew || "-",
-      truck: parsed.truck || "-",
-      insurance: parsed.insurance || "-",
-      note: parsed.note || "見積もり内容を確認してください。",
-    };
-  } catch {
-    return {
-      company: "未選択",
-      plan: "-",
-      price: "-",
-      crew: "-",
-      truck: "-",
-      insurance: "-",
-      note: "見積もり内容を確認してください。",
-    };
-  }
-}, []);
+    try {
+      const parsed = JSON.parse(saved) as SelectedQuote;
+      setSelectedQuote(parsed);
+    } catch {
+      // noop
+    }
+  }, []);
 
   return (
     <main className="min-h-screen bg-bg">
@@ -92,7 +74,7 @@ export default function ConfirmPage() {
                 </div>
 
                 <div className="rounded-2xl border border-border bg-bg p-5">
-                  <div className="text-sm font-semibold text-navy">今回のおすすめ理由</div>
+                  <div className="text-sm font-semibold text-navy">今回の選定メモ</div>
                   <p className="mt-3 text-sm leading-6 text-muted">
                     {selectedQuote.note}
                   </p>
