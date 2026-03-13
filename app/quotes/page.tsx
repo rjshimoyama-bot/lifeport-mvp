@@ -12,6 +12,15 @@ export default function QuotesPage() {
   const [sort, setSort] = useState<SortMode>("recommended");
   const [selected, setSelected] = useState<{ companyId: string; optionId: string } | null>(null);
   const [bundles, setBundles] = useState<QuoteBundle[]>([]);
+  const [selectedQuote, setSelectedQuote] = useState<{
+    company: string;
+    plan: string;
+    price: string;
+    crew: string;
+    truck: string;
+    insurance: string;
+    note: string;
+  } | null>(null);
 
   useEffect(() => {
     const primaryDate =
@@ -25,6 +34,15 @@ export default function QuotesPage() {
       (localStorage.getItem("lp_timeband") as "am" | "pm" | "all") || "all";
 
     setBundles(seedQuotes({ primaryDate, window: windowValue, timeband }));
+
+    const savedQuote = localStorage.getItem("movis_selected_quote");
+    if (savedQuote) {
+      try {
+        setSelectedQuote(JSON.parse(savedQuote));
+      } catch {
+        setSelectedQuote(null);
+      }
+    }
   }, []);
 
   const sorted = useMemo(() => {
@@ -76,6 +94,16 @@ export default function QuotesPage() {
               </button>
             </div>
 
+            {selectedQuote && (
+              <div className="mt-6 rounded-xl border border-cyan bg-cyan/10 p-4">
+                <div className="text-sm text-muted">選択中の見積</div>
+                <div className="text-navy font-semibold">{selectedQuote.company}</div>
+                <div className="text-sm text-muted">
+                  {selectedQuote.plan} / {selectedQuote.price}
+                </div>
+              </div>
+            )}
+
             <div className="mt-5 rounded-xl border border-cyan/30 bg-cyan/10 p-4">
               <div className="text-sm font-semibold text-navy">Movis AI 査定</div>
               <div className="mt-2 grid gap-3 md:grid-cols-4">
@@ -95,7 +123,27 @@ export default function QuotesPage() {
                   key={b.company.id}
                   bundle={b}
                   rank={index}
-                  onChoose={(companyId, optionId) => setSelected({ companyId, optionId })}
+                  onChoose={(companyId, optionId) => {
+                    setSelected({ companyId, optionId });
+
+                    const bundle = bundles.find((item) => item.company.id === companyId);
+                    const option = bundle?.options.find((item) => item.id === optionId);
+
+                    if (bundle && option) {
+                      const saved = {
+                        company: bundle.company.name,
+                        plan: option.label,
+                        price: formatJPY(option.price),
+                        crew: `${option.crew}名`,
+                        truck: "2tクラス",
+                        insurance: option.insurance,
+                        note: option.hint || "条件の良い見積もり候補です。",
+                      };
+
+                      localStorage.setItem("movis_selected_quote", JSON.stringify(saved));
+                      setSelectedQuote(saved);
+                    }
+                  }}
                 />
               ))}
             </div>
@@ -196,7 +244,7 @@ function QuoteCard({
                   "min-w-[140px] rounded-xl border px-4 py-3 text-left transition",
                   isActive
                     ? "border-cyan bg-[#E0F2FE] text-navy"
-                    : "border-border bg-white text-muted hover:bg-bg"
+                    : "border-border bg-white text-muted hover:bg-bg",
                 ].join(" ")}
               >
                 <div className="text-sm font-semibold">{o.label}</div>
@@ -229,26 +277,13 @@ function QuoteCard({
         >
           詳細を見る
         </button>
-       <button
-  className="inline-flex h-12 items-center justify-center rounded-lg bg-cyan px-5 text-sm font-semibold text-white hover:bg-[#0891B2]"
-  onClick={() => {
-    localStorage.setItem(
-      "movis_selected_quote",
-      JSON.stringify({
-        company: bundle.company.name,
-        plan: option.label,
-        price: formatJPY(option.price),
-        crew: `${option.crew}名`,
-        truck: "2tクラス",
-        insurance: option.insurance,
-        note: option.hint || "条件の良い見積もり候補です。",
-      })
-    );
-    onChoose(bundle.company.id, option.id);
-  }}
->
-  この日程で選ぶ
-</button>
+
+        <button
+          className="inline-flex h-12 items-center justify-center rounded-lg bg-cyan px-5 text-sm font-semibold text-white hover:bg-[#0891B2]"
+          onClick={() => onChoose(bundle.company.id, option.id)}
+        >
+          この日程で選ぶ
+        </button>
       </div>
     </div>
   );
@@ -262,4 +297,3 @@ function InfoBox({ title, value }: { title: string; value: string }) {
     </div>
   );
 }
-
