@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 
 type Lead = {
   id: string;
@@ -42,9 +43,37 @@ const mockLeads: Lead[] = [
 ];
 
 export default function AgentPage() {
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(mockLeads[0] ?? null);
+  const [copied, setCopied] = useState(false);
+
   const totalLeads = mockLeads.length;
   const completed = mockLeads.filter((lead) => lead.status === "成約").length;
   const inProgress = mockLeads.filter((lead) => lead.status !== "成約").length;
+
+  const inviteUrl = useMemo(() => {
+    if (!selectedLead) return "https://lifeport-mvp-c9hc.vercel.app/signup";
+    return `https://lifeport-mvp-c9hc.vercel.app/signup?lead=${selectedLead.id}`;
+  }, [selectedLead]);
+
+  const smsText = useMemo(() => {
+    if (!selectedLead) return "";
+    return `【Movis】引越し見積もりのご案内です。動画1本で複数社の見積もりを比較できます。こちらからご利用ください。 ${inviteUrl}`;
+  }, [selectedLead, inviteUrl]);
+
+  const handleCopy = async (text: string, mode: "url" | "sms") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+      if (mode === "url") {
+        alert("案内リンクをコピーしました。");
+      } else {
+        alert("SMS文面をコピーしました。");
+      }
+    } catch {
+      alert("コピーに失敗しました。");
+    }
+  };
 
   return (
     <main className="min-h-screen bg-bg">
@@ -64,11 +93,11 @@ export default function AgentPage() {
                   Agent Dashboard
                 </div>
                 <h1 className="mt-4 text-2xl font-bold text-navy md:text-3xl">
-                  Movis送客状況を確認
+                  Movis送客状況と案内導線を管理
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-muted md:text-base">
                   不動産会社は、入居者へのMovis案内状況や進捗、成約状況を確認できます。
-                  引越し見積もりだけでなく、入退去DXの接点として活用できます。
+                  案内リンクやSMS文面を活用して、入居者をスムーズにMovisへ送客できます。
                 </p>
               </div>
 
@@ -99,12 +128,12 @@ export default function AgentPage() {
                       text="契約時または入居前案内時にMovisを紹介"
                     />
                     <FlowCard
-                      title="ユーザー登録"
-                      text="入居者がMovisで動画査定・見積比較"
+                      title="案内リンク送付"
+                      text="SMSやメールでMovis案内URLを送付"
                     />
                     <FlowCard
-                      title="引越し成約"
-                      text="成約後は引越し準備やライフラインへ接続"
+                      title="動画査定・見積比較"
+                      text="入居者が動画登録し、複数社比較へ進む"
                     />
                   </div>
                 </div>
@@ -120,56 +149,136 @@ export default function AgentPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-border bg-bg p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-lg font-bold text-navy">送客案件一覧</div>
-                    <div className="mt-1 text-sm text-muted">
-                      不動産会社から案内した案件の進捗を確認できます
-                    </div>
-                  </div>
-
-                  <button
-                    className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-navy hover:bg-white/80"
-                    onClick={() => alert("今後はここから案内URL発行やSMS送信につなげる想定です。")}
-                  >
-                    案内リンク発行
-                  </button>
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  {mockLeads.map((lead) => (
-                    <div
-                      key={lead.id}
-                      className="rounded-2xl border border-border bg-white p-4"
-                    >
-                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <div className="text-sm font-bold text-navy">
-                            {lead.customerName} / {lead.propertyName}
-                          </div>
-                          <div className="mt-1 text-xs text-muted">
-                            案件ID：{lead.id} / 引越予定日：{lead.moveDate}
-                          </div>
-                        </div>
-
-                        <AgentStatusBadge status={lead.status} />
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-border bg-bg p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-lg font-bold text-navy">送客案件一覧</div>
+                      <div className="mt-1 text-sm text-muted">
+                        不動産会社から案内した案件の進捗を確認できます
                       </div>
                     </div>
-                  ))}
+
+                    <Link
+                      href="/signup"
+                      className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-navy hover:bg-white/80"
+                    >
+                      ユーザー画面確認
+                    </Link>
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    {mockLeads.map((lead) => (
+                      <button
+                        key={lead.id}
+                        onClick={() => setSelectedLead(lead)}
+                        className={[
+                          "w-full rounded-2xl border p-4 text-left transition",
+                          selectedLead?.id === lead.id
+                            ? "border-cyan bg-cyan/10"
+                            : "border-border bg-white hover:bg-bg",
+                        ].join(" ")}
+                      >
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <div className="text-sm font-bold text-navy">
+                              {lead.customerName} / {lead.propertyName}
+                            </div>
+                            <div className="mt-1 text-xs text-muted">
+                              案件ID：{lead.id} / 引越予定日：{lead.moveDate}
+                            </div>
+                          </div>
+
+                          <AgentStatusBadge status={lead.status} />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-border bg-white p-5">
+                {selectedLead && (
+                  <div className="rounded-2xl border border-border bg-white p-5 shadow-soft">
+                    <div className="text-lg font-bold text-navy">案内リンク発行</div>
+                    <div className="mt-2 text-sm text-muted">
+                      {selectedLead.customerName} / {selectedLead.propertyName} 向けの案内導線
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-border bg-bg p-4">
+                      <div className="text-xs font-semibold text-muted">案内URL</div>
+                      <div className="mt-2 break-all text-sm font-medium text-navy">
+                        {inviteUrl}
+                      </div>
+
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                        <button
+                          className="inline-flex h-11 items-center justify-center rounded-lg bg-cyan px-4 text-sm font-semibold text-white hover:bg-[#0891B2]"
+                          onClick={() => handleCopy(inviteUrl, "url")}
+                        >
+                          URLをコピー
+                        </button>
+
+                        <a
+                          href={inviteUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-navy hover:bg-white/80"
+                        >
+                          新しいタブで開く
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-border bg-bg p-4">
+                      <div className="text-xs font-semibold text-muted">SMS送信用文面</div>
+                      <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-navy">
+                        {smsText}
+                      </div>
+
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                        <button
+                          className="inline-flex h-11 items-center justify-center rounded-lg bg-cyan px-4 text-sm font-semibold text-white hover:bg-[#0891B2]"
+                          onClick={() => handleCopy(smsText, "sms")}
+                        >
+                          文面をコピー
+                        </button>
+
+                        <button
+                          className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-navy hover:bg-white/80"
+                          onClick={() => alert("実運用ではここからSMS送信やメール送信に接続する想定です。")}
+                        >
+                          送信する（デモ）
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-cyan/30 bg-cyan/10 p-4">
+                      <div className="text-sm font-semibold text-navy">店舗案内時の使い方</div>
+                      <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
+                        <li>・契約完了後にURLをSMSまたはメールで送付</li>
+                        <li>・対面案内時はQRコード案内に置き換え可能</li>
+                        <li>・ライフライン申込導線と同タイミングで案内可能</li>
+                      </ul>
+                    </div>
+
+                    {copied && (
+                      <div className="mt-4 text-sm font-medium text-cyan">
+                        コピーしました。
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-border bg-white p-5">
                   <div className="text-sm font-semibold text-navy">今後の拡張イメージ</div>
                   <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
-                    <li>・QRコードやSMSで入居者に案内</li>
+                    <li>・QRコード自動生成</li>
                     <li>・店舗別、担当者別の送客実績管理</li>
                     <li>・ライフライン申込率や付帯収益の可視化</li>
-                    <li>・引越し進捗に応じた自動リマインド</li>
+                    <li>・進捗に応じた自動リマインド送信</li>
                   </ul>
                 </div>
 
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Link
                     href="/"
                     className="inline-flex h-12 items-center justify-center rounded-lg border border-border bg-white px-5 text-sm font-semibold text-navy hover:bg-white/80"
