@@ -7,6 +7,7 @@ type RequestStatus = "new" | "reviewing" | "quoted";
 
 type MoveRequest = {
   id: string;
+  companyName: string;
   customerType: string;
   fromArea: string;
   toArea: string;
@@ -20,54 +21,6 @@ type MoveRequest = {
   videoStatus: string;
   status: RequestStatus;
 };
-
-const mockRequests: MoveRequest[] = [
-  {
-    id: "MV-24001",
-    customerType: "2人暮らし",
-    fromArea: "東京都世田谷区",
-    toArea: "神奈川県横浜市",
-    layout: "1LDK",
-    preferredDate: "2026/03/22",
-    flexibility: "前後3日OK",
-    timeband: "終日可",
-    buildingFrom: "3階 / EVなし",
-    buildingTo: "2階 / EVあり",
-    note: "洗濯機・冷蔵庫あり。段ボールは標準量を想定。",
-    videoStatus: "動画あり",
-    status: "new",
-  },
-  {
-    id: "MV-24002",
-    customerType: "単身",
-    fromArea: "神奈川県川崎市",
-    toArea: "東京都新宿区",
-    layout: "1K",
-    preferredDate: "2026/03/24",
-    flexibility: "1日固定",
-    timeband: "午前希望",
-    buildingFrom: "5階 / EVあり",
-    buildingTo: "4階 / EVあり",
-    note: "大型家具少なめ。デスクとテレビ台あり。",
-    videoStatus: "動画あり",
-    status: "reviewing",
-  },
-  {
-    id: "MV-24003",
-    customerType: "家族",
-    fromArea: "東京都練馬区",
-    toArea: "埼玉県さいたま市",
-    layout: "3LDK",
-    preferredDate: "2026/03/28",
-    flexibility: "前後1週間OK",
-    timeband: "午後希望",
-    buildingFrom: "戸建て",
-    buildingTo: "戸建て",
-    note: "大型家具多め。ベッド複数・食器棚あり。",
-    videoStatus: "動画あり",
-    status: "quoted",
-  },
-];
 
 type QuoteForm = {
   dateOption1: string;
@@ -95,6 +48,57 @@ const initialForm: QuoteForm = {
   comment: "",
 };
 
+const mockRequests: MoveRequest[] = [
+  {
+    id: "MV-24001",
+    companyName: "サクラ引越センター",
+    customerType: "2人暮らし",
+    fromArea: "東京都世田谷区",
+    toArea: "神奈川県横浜市",
+    layout: "1LDK",
+    preferredDate: "2026/03/22",
+    flexibility: "前後3日OK",
+    timeband: "終日可",
+    buildingFrom: "3階 / EVなし",
+    buildingTo: "2階 / EVあり",
+    note: "洗濯機・冷蔵庫あり。段ボールは標準量を想定。",
+    videoStatus: "動画あり",
+    status: "new",
+  },
+  {
+    id: "MV-24002",
+    companyName: "ミライ運送",
+    customerType: "単身",
+    fromArea: "神奈川県川崎市",
+    toArea: "東京都新宿区",
+    layout: "1K",
+    preferredDate: "2026/03/24",
+    flexibility: "1日固定",
+    timeband: "午前希望",
+    buildingFrom: "5階 / EVあり",
+    buildingTo: "4階 / EVあり",
+    note: "大型家具少なめ。デスクとテレビ台あり。",
+    videoStatus: "動画あり",
+    status: "reviewing",
+  },
+  {
+    id: "MV-24003",
+    companyName: "スマートムーブ",
+    customerType: "家族",
+    fromArea: "東京都練馬区",
+    toArea: "埼玉県さいたま市",
+    layout: "3LDK",
+    preferredDate: "2026/03/28",
+    flexibility: "前後1週間OK",
+    timeband: "午後希望",
+    buildingFrom: "戸建て",
+    buildingTo: "戸建て",
+    note: "大型家具多め。ベッド複数・食器棚あり。",
+    videoStatus: "動画あり",
+    status: "quoted",
+  },
+];
+
 export default function CarrierPage() {
   const [requests, setRequests] = useState<MoveRequest[]>(mockRequests);
   const [selectedId, setSelectedId] = useState<string | null>(mockRequests[0]?.id ?? null);
@@ -116,6 +120,63 @@ export default function CarrierPage() {
       alert("少なくとも1つの日程と見積金額を入力してください。");
       return;
     }
+
+    const toCrewNumber = (value: string) => {
+      const parsed = Number(value.replace("名", ""));
+      return Number.isNaN(parsed) ? 2 : parsed;
+    };
+
+    const submittedQuote = {
+      companyId: selectedRequest.id,
+      companyName: selectedRequest.companyName,
+      companyNote: `${selectedRequest.companyName} から提出された見積です`,
+      rating: 4.5,
+      options: [
+        form.dateOption1 && form.price1
+          ? {
+              id: `${selectedRequest.id}-1`,
+              label: form.dateOption1,
+              price: Number(form.price1),
+              crew: toCrewNumber(form.crew),
+              boxes: 20,
+              insurance: form.insurance,
+              hint: form.comment || "提出された見積です。",
+            }
+          : null,
+        form.dateOption2 && form.price2
+          ? {
+              id: `${selectedRequest.id}-2`,
+              label: form.dateOption2,
+              price: Number(form.price2),
+              crew: toCrewNumber(form.crew),
+              boxes: 20,
+              insurance: form.insurance,
+              hint: form.comment || "提出された見積です。",
+            }
+          : null,
+        form.dateOption3 && form.price3
+          ? {
+              id: `${selectedRequest.id}-3`,
+              label: form.dateOption3,
+              price: Number(form.price3),
+              crew: toCrewNumber(form.crew),
+              boxes: 20,
+              insurance: form.insurance,
+              hint: form.comment || "提出された見積です。",
+            }
+          : null,
+      ].filter(Boolean),
+      truck: form.truck,
+      insurance: form.insurance,
+    };
+
+    const existing = JSON.parse(localStorage.getItem("movis_submitted_quotes") || "[]");
+    const filtered = existing.filter((item: any) => item.companyId !== selectedRequest.id);
+
+    localStorage.setItem(
+      "movis_submitted_quotes",
+      JSON.stringify([...filtered, submittedQuote])
+    );
 
     alert("見積を提出しました（デモ）。");
 
@@ -178,7 +239,7 @@ export default function CarrierPage() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <div className="text-sm font-bold text-navy">{req.id}</div>
+                            <div className="text-sm font-bold text-navy">{req.companyName}</div>
                             <div className="mt-1 text-sm text-navy">
                               {req.fromArea} → {req.toArea}
                             </div>
@@ -206,8 +267,9 @@ export default function CarrierPage() {
                         <div>
                           <div className="text-sm font-semibold text-muted">案件詳細</div>
                           <div className="mt-1 text-xl font-bold text-navy">
-                            {selectedRequest.id}
+                            {selectedRequest.companyName}
                           </div>
+                          <div className="mt-1 text-sm text-muted">{selectedRequest.id}</div>
                         </div>
                         <StatusBadge status={selectedRequest.status} />
                       </div>
@@ -323,9 +385,7 @@ export default function CarrierPage() {
                       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                         <button
                           className="inline-flex h-12 items-center justify-center rounded-lg border border-border bg-white px-5 text-sm font-semibold text-navy hover:bg-bg"
-                          onClick={() => {
-                            setForm(initialForm);
-                          }}
+                          onClick={() => setForm(initialForm)}
                         >
                           入力をクリア
                         </button>
