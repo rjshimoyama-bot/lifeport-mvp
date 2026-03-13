@@ -229,12 +229,26 @@ function QuoteCard({
         >
           詳細を見る
         </button>
-        <button
-          className="inline-flex h-12 items-center justify-center rounded-lg bg-cyan px-5 text-sm font-semibold text-white hover:bg-[#0891B2]"
-          onClick={() => onChoose(bundle.company.id, option.id)}
-        >
-          この日程で選ぶ
-        </button>
+       <button
+  className="inline-flex h-12 items-center justify-center rounded-lg bg-cyan px-5 text-sm font-semibold text-white hover:bg-[#0891B2]"
+  onClick={() => {
+    localStorage.setItem(
+      "movis_selected_quote",
+      JSON.stringify({
+        company: bundle.company.name,
+        plan: option.label,
+        price: formatJPY(option.price),
+        crew: `${option.crew}名`,
+        truck: "2tクラス",
+        insurance: option.insurance,
+        note: option.hint || "条件の良い見積もり候補です。",
+      })
+    );
+    onChoose(bundle.company.id, option.id);
+  }}
+>
+  この日程で選ぶ
+</button>
       </div>
     </div>
   );
@@ -248,3 +262,4 @@ function InfoBox({ title, value }: { title: string; value: string }) {
     </div>
   );
 }
+
