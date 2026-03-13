@@ -7,9 +7,27 @@ import { seedQuotes } from "../../lib/mock";
 import { formatJPY } from "../../lib/format";
 
 type SortMode = "recommended" | "price";
+type ViewMode = "submitted" | "mixed" | "mock";
+
+type SubmittedQuote = {
+  companyId: string;
+  companyName: string;
+  companyNote: string;
+  rating: number;
+  options: {
+    id: string;
+    label: string;
+    price: number;
+    crew: number;
+    boxes: number;
+    insurance: string;
+    hint: string;
+  }[];
+};
 
 export default function QuotesPage() {
   const [sort, setSort] = useState<SortMode>("recommended");
+  const [viewMode, setViewMode] = useState<ViewMode>("mixed");
   const [selected, setSelected] = useState<{ companyId: string; optionId: string } | null>(null);
   const [bundles, setBundles] = useState<QuoteBundle[]>([]);
   const [selectedQuote, setSelectedQuote] = useState<{
@@ -33,7 +51,30 @@ export default function QuotesPage() {
     const timeband =
       (localStorage.getItem("lp_timeband") as "am" | "pm" | "all") || "all";
 
-    setBundles(seedQuotes({ primaryDate, window: windowValue, timeband }));
+    const baseQuotes = seedQuotes({ primaryDate, window: windowValue, timeband });
+
+    const submittedQuotes: SubmittedQuote[] = JSON.parse(
+      localStorage.getItem("movis_submitted_quotes") || "[]"
+    );
+
+    const convertedSubmitted = submittedQuotes.map((item) => ({
+      company: {
+        id: item.companyId,
+        name: item.companyName,
+        note: item.companyNote,
+      },
+      rating: item.rating,
+      options: item.options,
+      basePriceMin: Math.min(...item.options.map((o) => o.price)),
+    })) as QuoteBundle[];
+
+    if (viewMode === "submitted") {
+      setBundles(convertedSubmitted);
+    } else if (viewMode === "mock") {
+      setBundles(baseQuotes);
+    } else {
+      setBundles([...convertedSubmitted, ...baseQuotes]);
+    }
 
     const savedQuote = localStorage.getItem("movis_selected_quote");
     if (savedQuote) {
@@ -43,7 +84,7 @@ export default function QuotesPage() {
         setSelectedQuote(null);
       }
     }
-  }, []);
+  }, [viewMode]);
 
   const sorted = useMemo(() => {
     const copy = [...bundles];
@@ -86,12 +127,24 @@ export default function QuotesPage() {
                 </p>
               </div>
 
-              <button
-                className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-medium text-navy hover:bg-bg"
-                onClick={() => setSort((v) => (v === "recommended" ? "price" : "recommended"))}
-              >
-                並び替え：{sort === "recommended" ? "おすすめ順" : "価格順"}
-              </button>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-medium text-navy hover:bg-bg"
+                  onClick={() => setSort((v) => (v === "recommended" ? "price" : "recommended"))}
+                >
+                  並び替え：{sort === "recommended" ? "おすすめ順" : "価格順"}
+                </button>
+
+                <select
+                  className="h-11 rounded-lg border border-border bg-white px-4 text-sm font-medium text-navy"
+                  value={viewMode}
+                  onChange={(e) => setViewMode(e.target.value as ViewMode)}
+                >
+                  <option value="mixed">表示：提出＋モック</option>
+                  <option value="submitted">表示：提出見積のみ</option>
+                  <option value="mock">表示：モックのみ</option>
+                </select>
+              </div>
             </div>
 
             {selectedQuote && (
@@ -118,34 +171,40 @@ export default function QuotesPage() {
             </div>
 
             <div className="mt-8 space-y-5">
-              {sorted.map((b, index) => (
-                <QuoteCard
-                  key={b.company.id}
-                  bundle={b}
-                  rank={index}
-                  onChoose={(companyId, optionId) => {
-                    setSelected({ companyId, optionId });
+              {sorted.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-bg p-8 text-center text-muted">
+                  まだ提出された見積がありません。
+                </div>
+              ) : (
+                sorted.map((b, index) => (
+                  <QuoteCard
+                    key={b.company.id}
+                    bundle={b}
+                    rank={index}
+                    onChoose={(companyId, optionId) => {
+                      setSelected({ companyId, optionId });
 
-                    const bundle = bundles.find((item) => item.company.id === companyId);
-                    const option = bundle?.options.find((item) => item.id === optionId);
+                      const bundle = bundles.find((item) => item.company.id === companyId);
+                      const option = bundle?.options.find((item) => item.id === optionId);
 
-                    if (bundle && option) {
-                      const saved = {
-                        company: bundle.company.name,
-                        plan: option.label,
-                        price: formatJPY(option.price),
-                        crew: `${option.crew}名`,
-                        truck: "2tクラス",
-                        insurance: option.insurance,
-                        note: option.hint || "条件の良い見積もり候補です。",
-                      };
+                      if (bundle && option) {
+                        const saved = {
+                          company: bundle.company.name,
+                          plan: option.label,
+                          price: formatJPY(option.price),
+                          crew: `${option.crew}名`,
+                          truck: "2tクラス",
+                          insurance: option.insurance,
+                          note: option.hint || "条件の良い見積もり候補です。",
+                        };
 
-                      localStorage.setItem("movis_selected_quote", JSON.stringify(saved));
-                      setSelectedQuote(saved);
-                    }
-                  }}
-                />
-              ))}
+                        localStorage.setItem("movis_selected_quote", JSON.stringify(saved));
+                        setSelectedQuote(saved);
+                      }
+                    }}
+                  />
+                ))
+              )}
             </div>
 
             {chosen && (
