@@ -5,16 +5,54 @@ import { useMemo } from "react";
 
 export default function ConfirmPage() {
   const selectedQuote = useMemo(() => {
+  if (typeof window === "undefined") {
     return {
-      company: "A社（おすすめ）",
-      plan: "3/22 終日便",
-      price: "72,000円",
-      crew: "2名",
-      truck: "2tクラス",
-      insurance: "あり",
-      note: "ルート効率が良く、価格が抑えられている候補です。",
+      company: "未選択",
+      plan: "-",
+      price: "-",
+      crew: "-",
+      truck: "-",
+      insurance: "-",
+      note: "見積もり内容を確認してください。",
     };
-  }, []);
+  }
+
+  const saved = localStorage.getItem("movis_selected_quote");
+  if (!saved) {
+    return {
+      company: "未選択",
+      plan: "-",
+      price: "-",
+      crew: "-",
+      truck: "-",
+      insurance: "-",
+      note: "見積もり内容を確認してください。",
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+    return {
+      company: parsed.company || "未選択",
+      plan: parsed.plan || "-",
+      price: parsed.price || "-",
+      crew: parsed.crew || "-",
+      truck: parsed.truck || "-",
+      insurance: parsed.insurance || "-",
+      note: parsed.note || "見積もり内容を確認してください。",
+    };
+  } catch {
+    return {
+      company: "未選択",
+      plan: "-",
+      price: "-",
+      crew: "-",
+      truck: "-",
+      insurance: "-",
+      note: "見積もり内容を確認してください。",
+    };
+  }
+}, []);
 
   return (
     <main className="min-h-screen bg-bg">
