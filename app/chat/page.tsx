@@ -1,13 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Message = {
   id: number;
   sender: "user" | "company" | "system";
   text: string;
   time: string;
+};
+
+type SelectedQuote = {
+  company: string;
+  plan: string;
+  price: string;
+  crew: string;
+  truck: string;
+  insurance: string;
+  note: string;
 };
 
 const QUICK_QUESTIONS = [
@@ -18,6 +28,16 @@ const QUICK_QUESTIONS = [
 ];
 
 export default function ChatPage() {
+  const [selectedSummary, setSelectedSummary] = useState<SelectedQuote>({
+    company: "未選択",
+    plan: "-",
+    price: "-",
+    crew: "-",
+    truck: "-",
+    insurance: "-",
+    note: "見積もり内容を確認してください。",
+  });
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -25,79 +45,78 @@ export default function ChatPage() {
       text: "Movisチャットへようこそ。見積もり内容の確認や、条件のすり合わせにご利用いただけます。",
       time: "10:00",
     },
-    {
-      id: 2,
-      sender: "company",
-      text: "ご検討ありがとうございます。ご不明点があればお気軽にご質問ください。",
-      time: "10:01",
-    },
   ]);
 
   const [input, setInput] = useState("");
 
+  useEffect(() => {
+    const saved = localStorage.getItem("movis_selected_quote");
+
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as SelectedQuote;
+        setSelectedSummary(parsed);
+
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === 2);
+          if (exists) return prev;
+
+          return [
+            ...prev,
+            {
+              id: 2,
+              sender: "company",
+              text: `${parsed.company}です。ご検討ありがとうございます。${parsed.plan} / ${parsed.price} の条件でご案内しています。ご不明点があればお気軽にご質問ください。`,
+              time: "10:01",
+            },
+          ];
+        });
+      } catch {
+        // noop
+      }
+    }
+  }, []);
+
   const canSend = input.trim().length > 0;
-
-  const selectedSummary = useMemo(() => {
-  if (typeof window === "undefined") {
-    return {
-      company: "未選択",
-      plan: "-",
-      price: "-",
-    };
-  }
-
-  const saved = localStorage.getItem("movis_selected_quote");
-  if (!saved) {
-    return {
-      company: "未選択",
-      plan: "-",
-      price: "-",
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(saved);
-    return {
-      company: parsed.company || "未選択",
-      plan: parsed.plan || "-",
-      price: parsed.price || "-",
-    };
-  } catch {
-    return {
-      company: "未選択",
-      plan: "-",
-      price: "-",
-    };
-  }
-}, []);
 
   const sendMessage = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    const now = new Date().toLocaleTimeString("ja-JP", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
     const nextUserMessage: Message = {
       id: Date.now(),
       sender: "user",
       text: trimmed,
-      time: new Date().toLocaleTimeString("ja-JP", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      time: now,
     };
 
     const nextCompanyMessage: Message = {
       id: Date.now() + 1,
       sender: "company",
-      text: "ありがとうございます。担当に確認のうえ、回答いたします。（デモ）",
-      time: new Date().toLocaleTimeString("ja-JP", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      text: `${selectedSummary.company}より回答です。ありがとうございます。担当に確認のうえ、回答いたします。（デモ）`,
+      time: now,
     };
 
     setMessages((prev) => [...prev, nextUserMessage, nextCompanyMessage]);
     setInput("");
   };
+
+  const infoRows = useMemo(
+    () => [
+      { label: "会社", value: selectedSummary.company },
+      { label: "日程", value: selectedSummary.plan },
+      { label: "料金", value: selectedSummary.price },
+      { label: "作業員", value: selectedSummary.crew },
+      { label: "トラック", value: selectedSummary.truck },
+      { label: "保険", value: selectedSummary.insurance },
+    ],
+    [selectedSummary]
+  );
 
   return (
     <main className="min-h-screen bg-bg">
@@ -130,19 +149,17 @@ export default function ChatPage() {
                 <div className="rounded-2xl border border-cyan/30 bg-cyan/10 p-5">
                   <div className="text-sm font-semibold text-navy">選択中の見積もり</div>
                   <div className="mt-4 space-y-3">
-                    <SummaryRow label="会社" value={selectedSummary.company} />
-                    <SummaryRow label="日程" value={selectedSummary.plan} />
-                    <SummaryRow label="料金" value={selectedSummary.price} />
+                    {infoRows.map((row) => (
+                      <SummaryRow key={row.label} label={row.label} value={row.value} />
+                    ))}
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-border bg-bg p-5">
-                  <div className="text-sm font-semibold text-navy">Movisのチャット設計</div>
-                  <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
-                    <li>・電話番号は契約成立まで公開されません</li>
-                    <li>・条件確認をテキストで残せます</li>
-                    <li>・比較した上で安心して依頼できます</li>
-                  </ul>
+                  <div className="text-sm font-semibold text-navy">今回の補足</div>
+                  <p className="mt-3 text-sm leading-6 text-muted">
+                    {selectedSummary.note}
+                  </p>
                 </div>
 
                 <div className="rounded-2xl border border-border bg-white p-5">
@@ -164,7 +181,7 @@ export default function ChatPage() {
               <div className="rounded-2xl border border-border bg-bg p-4 md:p-5">
                 <div className="flex items-center justify-between rounded-xl border border-border bg-white px-4 py-3">
                   <div>
-                    <div className="text-sm font-semibold text-navy">A社（おすすめ）</div>
+                    <div className="text-sm font-semibold text-navy">{selectedSummary.company}</div>
                     <div className="text-xs text-muted">見積内容の確認チャット</div>
                   </div>
                   <div className="rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-semibold text-navy">
@@ -224,7 +241,7 @@ export default function ChatPage() {
                           "inline-flex h-12 items-center justify-center rounded-lg px-5 text-sm font-semibold transition",
                           canSend
                             ? "bg-cyan text-white hover:bg-[#0891B2]"
-                            : "pointer-events-none bg-border text-muted"
+                            : "pointer-events-none bg-border text-muted",
                         ].join(" ")}
                         onClick={() => sendMessage(input)}
                       >
