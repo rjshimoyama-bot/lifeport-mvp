@@ -1,14 +1,80 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+type LeadInfo = {
+  leadId: string;
+  agentName: string;
+  propertyName: string;
+};
+
+const mockLeadMap: Record<string, LeadInfo> = {
+  "AG-001": {
+    leadId: "AG-001",
+    agentName: "横浜店",
+    propertyName: "レジデンス横浜",
+  },
+  "AG-002": {
+    leadId: "AG-002",
+    agentName: "新宿店",
+    propertyName: "グラン新宿",
+  },
+  "AG-003": {
+    leadId: "AG-003",
+    agentName: "世田谷店",
+    propertyName: "パーク世田谷",
+  },
+  "AG-004": {
+    leadId: "AG-004",
+    agentName: "川崎店",
+    propertyName: "シティ川崎",
+  },
+};
 
 export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [leadInfo, setLeadInfo] = useState<LeadInfo | null>(null);
 
-  const canNext = name.trim() && email.trim() && phone.trim();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const lead = params.get("lead");
+
+    if (!lead) {
+      localStorage.removeItem("movis_lead_info");
+      return;
+    }
+
+    const matched = mockLeadMap[lead] || {
+      leadId: lead,
+      agentName: "不動産会社",
+      propertyName: "対象物件",
+    };
+
+    setLeadInfo(matched);
+    localStorage.setItem("movis_lead_info", JSON.stringify(matched));
+  }, []);
+
+  const canNext = useMemo(() => {
+    return name.trim() && email.trim() && phone.trim();
+  }, [name, email, phone]);
+
+  const handleNext = () => {
+    if (!canNext) return;
+
+    localStorage.setItem(
+      "movis_user_info",
+      JSON.stringify({
+        name,
+        email,
+        phone,
+      })
+    );
+
+    window.location.href = "/schedule";
+  };
 
   return (
     <main className="min-h-screen bg-bg">
@@ -35,6 +101,22 @@ export default function SignupPage() {
                   Movisでは、動画査定と見積比較をスムーズに進めるために、
                   最初にお名前・メール・電話番号をご入力いただきます。
                 </p>
+
+                {leadInfo && (
+                  <div className="mt-6 rounded-2xl border border-cyan/30 bg-cyan/10 p-5">
+                    <div className="text-sm font-semibold text-navy">
+                      不動産会社からのご案内案件
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      <LeadRow label="案件ID" value={leadInfo.leadId} />
+                      <LeadRow label="案内元" value={leadInfo.agentName} />
+                      <LeadRow label="物件名" value={leadInfo.propertyName} />
+                    </div>
+                    <p className="mt-4 text-sm leading-6 text-muted">
+                      この案件情報は、Movis上での進捗確認や送客管理に利用されます。
+                    </p>
+                  </div>
+                )}
 
                 <div className="mt-6 rounded-2xl border border-cyan/30 bg-cyan/10 p-5">
                   <div className="text-sm font-semibold text-navy">Movisの安心設計</div>
@@ -101,17 +183,17 @@ export default function SignupPage() {
                     戻る
                   </Link>
 
-                  <Link
-                    href="/schedule"
+                  <button
+                    onClick={handleNext}
                     className={[
                       "inline-flex h-12 items-center justify-center rounded-lg px-5 text-sm font-semibold transition",
                       canNext
                         ? "bg-cyan text-white hover:bg-[#0891B2]"
-                        : "pointer-events-none bg-border text-muted"
+                        : "pointer-events-none bg-border text-muted",
                     ].join(" ")}
                   >
                     次へ進む
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>
@@ -119,5 +201,14 @@ export default function SignupPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function LeadRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-white/60 bg-white px-4 py-3">
+      <div className="text-xs font-semibold text-muted">{label}</div>
+      <div className="text-sm font-semibold text-navy">{value}</div>
+    </div>
   );
 }
