@@ -38,12 +38,38 @@ export default function ChatPage() {
   const canSend = input.trim().length > 0;
 
   const selectedSummary = useMemo(() => {
+  if (typeof window === "undefined") {
     return {
-      company: "A社（おすすめ）",
-      plan: "3/22 終日",
-      price: "72,000円",
+      company: "未選択",
+      plan: "-",
+      price: "-",
     };
-  }, []);
+  }
+
+  const saved = localStorage.getItem("movis_selected_quote");
+  if (!saved) {
+    return {
+      company: "未選択",
+      plan: "-",
+      price: "-",
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+    return {
+      company: parsed.company || "未選択",
+      plan: parsed.plan || "-",
+      price: parsed.price || "-",
+    };
+  } catch {
+    return {
+      company: "未選択",
+      plan: "-",
+      price: "-",
+    };
+  }
+}, []);
 
   const sendMessage = (text: string) => {
     const trimmed = text.trim();
