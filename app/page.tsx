@@ -50,6 +50,33 @@ function SecondaryButton({
   );
 }
 
+function PortalCard({
+  title,
+  description,
+  href,
+  linkLabel,
+}: {
+  title: string;
+  description: string;
+  href: string;
+  linkLabel: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-white p-6 shadow-soft">
+      <div className="text-lg font-bold text-navy">{title}</div>
+      <p className="mt-3 text-sm leading-6 text-muted">{description}</p>
+      <div className="mt-5">
+        <Link
+          href={href}
+          className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-bg px-4 text-sm font-semibold text-navy hover:bg-white"
+        >
+          {linkLabel}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function Page() {
   return (
     <main className="min-h-screen bg-bg">
@@ -70,7 +97,7 @@ export default function Page() {
               <Badge>動画査定</Badge>
               <Badge>電話なし</Badge>
               <Badge>複数社比較</Badge>
-              <Badge>適正価格</Badge>
+              <Badge>不動産導線</Badge>
             </div>
 
             <div className="mt-6 max-w-3xl">
@@ -82,6 +109,7 @@ export default function Page() {
               <p className="mt-4 text-base leading-7 text-muted md:text-lg">
                 訪問見積もりも、長い電話も不要。
                 スマホで部屋を撮影するだけで、複数の引越会社から適正価格の見積もりが届きます。
+                Movisは、不動産会社・引越会社・入居者をつなぐ引越しDXプラットフォームです。
               </p>
             </div>
 
@@ -92,27 +120,29 @@ export default function Page() {
           </Card>
         </section>
 
-        <section className="mt-8 grid gap-4 md:mt-10 md:grid-cols-3">
-          <Card>
-            <div className="text-lg font-semibold text-navy">動画で簡単査定</div>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              スマホで部屋を撮影するだけ。訪問見積もりなしで、引越しに必要な情報をまとめて伝えられます。
-            </p>
-          </Card>
+        <section className="mt-8 md:mt-10">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <div className="text-lg font-semibold text-navy">動画で簡単査定</div>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                スマホで部屋を撮影するだけ。訪問見積もりなしで、引越しに必要な情報をまとめて伝えられます。
+              </p>
+            </Card>
 
-          <Card>
-            <div className="text-lg font-semibold text-navy">複数社を一括比較</div>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              価格だけでなく、作業人数・条件・日程ごとの違いまで一覧で比較。納得して選べます。
-            </p>
-          </Card>
+            <Card>
+              <div className="text-lg font-semibold text-navy">複数社を一括比較</div>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                価格だけでなく、作業人数・条件・日程ごとの違いまで一覧で比較。納得して選べます。
+              </p>
+            </Card>
 
-          <Card>
-            <div className="text-lg font-semibold text-navy">チャットでそのまま決定</div>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              気になる会社とはチャットで確認。電話に振り回されず、スムーズに引越しを決められます。
-            </p>
-          </Card>
+            <Card>
+              <div className="text-lg font-semibold text-navy">チャットでそのまま決定</div>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                気になる会社とはチャットで確認。電話に振り回されず、スムーズに引越しを決められます。
+              </p>
+            </Card>
+          </div>
         </section>
 
         <section className="mt-8 md:mt-10">
@@ -140,9 +170,42 @@ export default function Page() {
                 <div className="text-sm font-semibold text-cyan">STEP 3</div>
                 <div className="mt-2 text-lg font-semibold text-navy">比較して決定</div>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  気になる会社とチャットで確認し、そのまま依頼。面倒な調整を減らせます。
+                  気になる会社とチャットで確認し、そのまま依頼。引越し準備タスクにもつながります。
                 </p>
               </div>
+            </div>
+          </Card>
+        </section>
+
+        <section className="mt-8 md:mt-10">
+          <Card>
+            <div className="text-2xl font-bold text-navy">Movisポータル</div>
+            <p className="mt-3 text-sm leading-6 text-muted">
+              Movisは、入居者・引越会社・不動産会社の3者をつなぐ設計です。
+              それぞれの立場に合わせた画面を用意しています。
+            </p>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <PortalCard
+                title="ユーザー向け"
+                description="動画査定、見積比較、チャット確認、契約、引越し準備タスクまで一気通貫で利用できます。"
+                href="/signup"
+                linkLabel="ユーザー画面へ"
+              />
+
+              <PortalCard
+                title="引越会社向け"
+                description="案件一覧、動画確認、日程別見積の提出など、Movis経由の案件対応を管理できます。"
+                href="/carrier"
+                linkLabel="引越会社画面へ"
+              />
+
+              <PortalCard
+                title="不動産会社向け"
+                description="Movis案内状況、送客案件の進捗、案内リンク発行やSMS文面確認などができます。"
+                href="/agent"
+                linkLabel="不動産会社画面へ"
+              />
             </div>
           </Card>
         </section>
@@ -164,8 +227,9 @@ export default function Page() {
                 動画1本で、複数社から適正価格を。Movisで、新しい引越し体験を。
               </p>
 
-              <div className="mt-5">
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <PrimaryButton href="/signup">無料で見積もりをはじめる</PrimaryButton>
+                <SecondaryButton href="/agent">不動産会社向け画面を見る</SecondaryButton>
               </div>
             </div>
           </Card>
