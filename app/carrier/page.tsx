@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type RequestStatus = "new" | "reviewing" | "quoted";
 
@@ -33,6 +33,24 @@ type QuoteForm = {
   truck: string;
   insurance: string;
   comment: string;
+};
+
+type ConfirmedOrder = {
+  id: string;
+  company: string;
+  plan: string;
+  price: string;
+  crew: string;
+  truck: string;
+  insurance: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  leadId: string;
+  agentName: string;
+  propertyName: string;
+  handoffAt: string;
+  status: string;
 };
 
 const initialForm: QuoteForm = {
@@ -103,11 +121,17 @@ export default function CarrierPage() {
   const [requests, setRequests] = useState<MoveRequest[]>(mockRequests);
   const [selectedId, setSelectedId] = useState<string | null>(mockRequests[0]?.id ?? null);
   const [form, setForm] = useState<QuoteForm>(initialForm);
+  const [confirmedOrders, setConfirmedOrders] = useState<ConfirmedOrder[]>([]);
 
   const selectedRequest = useMemo(
     () => requests.find((req) => req.id === selectedId) ?? null,
     [requests, selectedId]
   );
+
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem("movis_confirmed_orders") || "[]");
+    setConfirmedOrders(saved);
+  }, []);
 
   const updateForm = (key: keyof QuoteForm, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -211,7 +235,7 @@ export default function CarrierPage() {
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-muted md:text-base">
                   ユーザーがアップロードした動画と条件を確認し、引越会社ごとに日程別の見積を提出します。
-                  ルート効率や社内事情は各社判断で反映してください。
+                  発注確定後は、電話番号を含む連携情報が下部に反映されます。
                 </p>
               </div>
 
@@ -311,63 +335,18 @@ export default function CarrierPage() {
                       </p>
 
                       <div className="mt-6 grid gap-4 md:grid-cols-2">
-                        <Field
-                          label="候補日程 1"
-                          value={form.dateOption1}
-                          onChange={(v) => updateForm("dateOption1", v)}
-                          placeholder="例：3/22 終日"
-                        />
-                        <Field
-                          label="見積金額 1"
-                          value={form.price1}
-                          onChange={(v) => updateForm("price1", v)}
-                          placeholder="例：72000"
-                        />
-                        <Field
-                          label="候補日程 2"
-                          value={form.dateOption2}
-                          onChange={(v) => updateForm("dateOption2", v)}
-                          placeholder="例：3/23 午前"
-                        />
-                        <Field
-                          label="見積金額 2"
-                          value={form.price2}
-                          onChange={(v) => updateForm("price2", v)}
-                          placeholder="例：76000"
-                        />
-                        <Field
-                          label="候補日程 3"
-                          value={form.dateOption3}
-                          onChange={(v) => updateForm("dateOption3", v)}
-                          placeholder="例：3/24 午後"
-                        />
-                        <Field
-                          label="見積金額 3"
-                          value={form.price3}
-                          onChange={(v) => updateForm("price3", v)}
-                          placeholder="例：79000"
-                        />
+                        <Field label="候補日程 1" value={form.dateOption1} onChange={(v) => updateForm("dateOption1", v)} placeholder="例：3/22 終日" />
+                        <Field label="見積金額 1" value={form.price1} onChange={(v) => updateForm("price1", v)} placeholder="例：72000" />
+                        <Field label="候補日程 2" value={form.dateOption2} onChange={(v) => updateForm("dateOption2", v)} placeholder="例：3/23 午前" />
+                        <Field label="見積金額 2" value={form.price2} onChange={(v) => updateForm("price2", v)} placeholder="例：76000" />
+                        <Field label="候補日程 3" value={form.dateOption3} onChange={(v) => updateForm("dateOption3", v)} placeholder="例：3/24 午後" />
+                        <Field label="見積金額 3" value={form.price3} onChange={(v) => updateForm("price3", v)} placeholder="例：79000" />
                       </div>
 
                       <div className="mt-6 grid gap-4 md:grid-cols-3">
-                        <SelectField
-                          label="作業員"
-                          value={form.crew}
-                          onChange={(v) => updateForm("crew", v)}
-                          options={["2名", "3名", "4名"]}
-                        />
-                        <SelectField
-                          label="トラック"
-                          value={form.truck}
-                          onChange={(v) => updateForm("truck", v)}
-                          options={["1tクラス", "2tクラス", "4tクラス"]}
-                        />
-                        <SelectField
-                          label="保険"
-                          value={form.insurance}
-                          onChange={(v) => updateForm("insurance", v)}
-                          options={["あり", "簡易", "なし"]}
-                        />
+                        <SelectField label="作業員" value={form.crew} onChange={(v) => updateForm("crew", v)} options={["2名", "3名", "4名"]} />
+                        <SelectField label="トラック" value={form.truck} onChange={(v) => updateForm("truck", v)} options={["1tクラス", "2tクラス", "4tクラス"]} />
+                        <SelectField label="保険" value={form.insurance} onChange={(v) => updateForm("insurance", v)} options={["あり", "簡易", "なし"]} />
                       </div>
 
                       <div className="mt-6">
@@ -399,12 +378,65 @@ export default function CarrierPage() {
                       </div>
                     </div>
 
+                    <div className="rounded-2xl border border-border bg-white p-5 shadow-soft">
+                      <div className="text-lg font-bold text-navy">発注連携済み一覧</div>
+                      <p className="mt-2 text-sm leading-6 text-muted">
+                        発注先が決定し、電話番号連携まで完了した案件が表示されます。
+                      </p>
+
+                      <div className="mt-5 space-y-3">
+                        {confirmedOrders.length === 0 ? (
+                          <div className="rounded-xl border border-border bg-bg p-5 text-sm text-muted">
+                            まだ発注連携済みの案件はありません。
+                          </div>
+                        ) : (
+                          confirmedOrders.map((order) => (
+                            <div
+                              key={order.id}
+                              className="rounded-2xl border border-border bg-bg p-4"
+                            >
+                              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                <div>
+                                  <div className="text-sm font-bold text-navy">
+                                    {order.customerName} / {order.company}
+                                  </div>
+                                  <div className="mt-1 text-xs text-muted">
+                                    {order.plan} / {order.price}
+                                  </div>
+                                </div>
+
+                                <span className="inline-flex rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-semibold text-navy">
+                                  {order.status}
+                                </span>
+                              </div>
+
+                              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                                <InfoCard title="電話番号" value={order.customerPhone} />
+                                <InfoCard title="メール" value={order.customerEmail || "-"} />
+                                <InfoCard title="作業員 / トラック" value={`${order.crew} / ${order.truck}`} />
+                                <InfoCard title="保険" value={order.insurance} />
+                              </div>
+
+                              {(order.leadId || order.propertyName) && (
+                                <div className="mt-4 rounded-xl border border-border bg-white p-4">
+                                  <div className="text-xs text-muted">案内元情報</div>
+                                  <div className="mt-2 text-sm leading-6 text-navy">
+                                    案件ID: {order.leadId || "-"} / 案内元: {order.agentName || "-"} / 物件名: {order.propertyName || "-"}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
                     <div className="rounded-2xl border border-border bg-bg p-5">
                       <div className="text-sm font-semibold text-navy">Movisでの役割分担</div>
                       <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
                         <li>・Movis：動画と条件を整理して案件化</li>
                         <li>・引越会社：動画を見て各社判断で価格提示</li>
-                        <li>・日程柔軟性を活かして、各社にとって最適な価格を提示</li>
+                        <li>・発注確定後：電話番号を含む連携情報を受領</li>
                       </ul>
                     </div>
                   </div>
