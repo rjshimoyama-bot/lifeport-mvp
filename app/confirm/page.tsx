@@ -60,7 +60,7 @@ export default function ConfirmPage() {
                   </h1>
                   <p className="mt-3 text-sm leading-6 text-muted md:text-base">
                     チャットで確認した内容をもとに、依頼する引越会社と条件を最終確認します。
-                    内容に問題がなければ、このまま引越し準備へ進めます。
+                    内容に問題がなければ、このまま発注情報連携へ進めます。
                   </p>
                 </div>
 
@@ -68,8 +68,8 @@ export default function ConfirmPage() {
                   <div className="text-sm font-semibold text-navy">Movisの確認ポイント</div>
                   <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
                     <li>・価格だけでなく条件も確認したうえで依頼できます</li>
-                    <li>・電話番号は契約成立後に共有される想定です</li>
-                    <li>・このあと引越し準備タスクに進めます</li>
+                    <li>・電話番号は発注確定後に共有されます</li>
+                    <li>・次の画面で発注先へ連携する情報を最終確認します</li>
                   </ul>
                 </div>
 
@@ -85,7 +85,7 @@ export default function ConfirmPage() {
                 <div className="rounded-xl border border-border bg-white px-4 py-3">
                   <div className="text-lg font-bold text-navy">依頼内容の確認</div>
                   <div className="mt-1 text-sm text-muted">
-                    この内容で引越し依頼へ進みます
+                    この内容で発注情報連携へ進みます
                   </div>
                 </div>
 
@@ -103,7 +103,7 @@ export default function ConfirmPage() {
                   <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
                     <li>・最終的な詳細条件は引越会社との確認により確定します</li>
                     <li>・追加作業がある場合は別途料金が発生する場合があります</li>
-                    <li>・契約後は引越し準備タスクに沿って進められます</li>
+                    <li>・次の画面で電話番号を含む発注情報を連携します</li>
                   </ul>
                 </div>
 
@@ -116,15 +116,15 @@ export default function ConfirmPage() {
                   </Link>
 
                   <Link
-                    href="/tasks"
+                    href="/handoff"
                     className="inline-flex h-12 items-center justify-center rounded-lg bg-cyan px-5 text-sm font-semibold text-white transition hover:bg-[#0891B2]"
                   >
-                    この内容で進む
+                    発注情報連携へ進む
                   </Link>
                 </div>
 
                 <div className="mt-4 text-center text-xs text-muted">
-                  デモでは、次の画面で引越し準備タスク管理へ進みます。
+                  デモでは、次の画面で電話番号を含む連携確認を行います。
                 </div>
               </div>
             </div>
