@@ -2,42 +2,87 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { movingCompanies } from "../../lib/mock";
 
-type Status = "pending" | "reviewing" | "submitted";
+type LatestVideoMeta = {
+  id: string;
+  fileName: string;
+  fileType: string;
+  uploadedAt: string;
+  size: number;
+};
+
+type ProgressCompany = {
+  id: string;
+  name: string;
+  status: "受付済み" | "動画確認中" | "見積作成中" | "提出完了";
+  eta: string;
+};
+
+const mockCompanies: ProgressCompany[] = [
+  {
+    id: "c1",
+    name: "サクラ引越センター",
+    status: "動画確認中",
+    eta: "本日中に見積予定",
+  },
+  {
+    id: "c2",
+    name: "ミライ運送",
+    status: "見積作成中",
+    eta: "まもなく提示予定",
+  },
+  {
+    id: "c3",
+    name: "スマートムーブ",
+    status: "受付済み",
+    eta: "順次確認予定",
+  },
+];
 
 export default function ProgressPage() {
-  const [tick, setTick] = useState(0);
+  const [videoMeta, setVideoMeta] = useState<LatestVideoMeta | null>(null);
+  const [companies, setCompanies] = useState<ProgressCompany[]>(mockCompanies);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTick((prev) => prev + 1);
-    }, 900);
-
-    return () => clearInterval(timer);
+    const meta = localStorage.getItem("movis_latest_video_meta");
+    if (meta) {
+      try {
+        setVideoMeta(JSON.parse(meta));
+      } catch {
+        // noop
+      }
+    }
   }, []);
 
-  const statuses = useMemo(() => {
-    const submittedCount = Math.min(movingCompanies.length, Math.floor(tick / 2));
+  useEffect(() => {
+    if (!videoMeta) return;
 
-    return movingCompanies.map((company, index) => {
-      const status: Status =
-        index < submittedCount
-          ? "submitted"
-          : index < submittedCount + 2
-          ? "reviewing"
-          : "pending";
+    setCompanies([
+      {
+        id: "c1",
+        name: "サクラ引越センター",
+        status: "動画確認中",
+        eta: "動画確認後に見積提示",
+      },
+      {
+        id: "c2",
+        name: "ミライ運送",
+        status: "見積作成中",
+        eta: "条件整理後に提示予定",
+      },
+      {
+        id: "c3",
+        name: "スマートムーブ",
+        status: "受付済み",
+        eta: "受付完了・順次確認",
+      },
+    ]);
+  }, [videoMeta]);
 
-      return {
-        ...company,
-        status,
-      };
-    });
-  }, [tick]);
-
-  const submitted = statuses.filter((s) => s.status === "submitted").length;
-  const reviewing = statuses.filter((s) => s.status === "reviewing").length;
-  const pending = statuses.filter((s) => s.status === "pending").length;
+  const uploadedLabel = useMemo(() => {
+    if (!videoMeta) return "未アップロード";
+    return "アップロード済み";
+  }, [videoMeta]);
 
   return (
     <main className="min-h-screen bg-bg">
@@ -51,98 +96,128 @@ export default function ProgressPage() {
 
         <section className="mt-8">
           <div className="rounded-2xl border border-border bg-white p-6 shadow-soft md:p-8">
-            <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr]">
               <div>
                 <div className="inline-flex rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-semibold text-navy">
-                  STEP 4
+                  STEP 5
                 </div>
 
                 <h1 className="mt-4 text-2xl font-bold text-navy md:text-3xl">
-                  見積もりを収集中です
+                  見積もりの進捗を確認
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-muted md:text-base">
-                  Movis AI が動画情報を整理し、各引越会社が見積もりを作成しています。
-                  複数社の価格と条件がそろい次第、比較画面に進めます。
+                  アップロードされた動画を各引越会社が確認し、順次見積を作成しています。
+                  動画登録が完了していれば、各社はその内容を前提に見積提示へ進みます。
                 </p>
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <StatCard label="提出済み" value={`${submitted}社`} tone="cyan" />
-                  <StatCard label="確認中" value={`${reviewing}社`} tone="amber" />
-                  <StatCard label="未提出" value={`${pending}社`} tone="gray" />
-                </div>
-
                 <div className="mt-6 rounded-2xl border border-cyan/30 bg-cyan/10 p-5">
-                  <div className="text-sm font-semibold text-navy">Movis AI 処理内容</div>
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    <FlowMini title="動画確認" text="アップロードされた動画を受信" />
-                    <FlowMini title="荷物量整理" text="物量や条件を整理" />
-                    <FlowMini title="見積依頼" text="参加会社へ一括配信" />
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold text-navy">動画アップロード状況</div>
+                      <div className="mt-2 text-2xl font-bold text-navy">{uploadedLabel}</div>
+                    </div>
+
+                    <span
+                      className={[
+                        "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                        videoMeta
+                          ? "border-green-300 bg-green-50 text-green-700"
+                          : "border-border bg-white text-muted",
+                      ].join(" ")}
+                    >
+                      {videoMeta ? "見積依頼に利用中" : "未登録"}
+                    </span>
+                  </div>
+
+                  {videoMeta ? (
+                    <div className="mt-4 rounded-xl border border-white/60 bg-white p-4">
+                      <div className="text-xs text-muted">登録済み動画</div>
+                      <div className="mt-2 text-sm font-semibold text-navy">
+                        {videoMeta.fileName}
+                      </div>
+                      <div className="mt-1 text-xs leading-5 text-muted">
+                        保存サイズ：約{Math.round((videoMeta.size / 1024 / 1024) * 100) / 100} MB
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-border bg-white p-4 text-sm text-muted">
+                      まだ動画が登録されていません。動画を撮影・保存すると、引越会社の見積確認が始まります。
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <Link
+                      href="/video"
+                      className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-navy hover:bg-bg"
+                    >
+                      動画撮影へ戻る
+                    </Link>
+                    <Link
+                      href="/upload"
+                      className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-navy hover:bg-bg"
+                    >
+                      動画アップロード画面へ
+                    </Link>
                   </div>
                 </div>
 
                 <div className="mt-6 rounded-2xl border border-border bg-bg p-5">
-                  <div className="text-sm font-semibold text-navy">ユーザー向けの見え方</div>
-                  <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
-                    <li>・どの会社が見積中かを確認できます</li>
-                    <li>・価格だけでなく条件も比較できます</li>
-                    <li>・日程による価格差も確認できます</li>
-                  </ul>
+                  <div className="text-sm font-semibold text-navy">Movis上の現在ステータス</div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <StatusMini title="動画登録" value={videoMeta ? "完了" : "未完了"} />
+                    <StatusMini title="会社受付" value="進行中" />
+                    <StatusMini title="見積提示" value="準備中" />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <div className="rounded-2xl border border-border bg-bg p-5 md:p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="text-lg font-bold text-navy">参加会社の進捗</div>
-                    <div className="rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-semibold text-navy">
-                      リアルタイム表示（デモ）
-                    </div>
-                  </div>
+              <div className="rounded-2xl border border-border bg-bg p-5">
+                <div className="text-lg font-bold text-navy">引越会社ごとの進捗</div>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  動画が登録済みの場合、各社が内容確認を進めながら見積を作成します。
+                </p>
 
-                  <div className="mt-5 space-y-3">
-                    {statuses.map((company) => (
-                      <div
-                        key={company.id}
-                        className="rounded-xl border border-border bg-white p-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-semibold text-navy">
-                              {company.name}
-                            </div>
-                            <div className="mt-1 text-xs leading-5 text-muted">
-                              {company.note}
-                            </div>
-                          </div>
-
-                          <StatusBadge status={company.status} />
+                <div className="mt-5 space-y-3">
+                  {companies.map((company) => (
+                    <div
+                      key={company.id}
+                      className="rounded-2xl border border-border bg-white p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-bold text-navy">{company.name}</div>
+                          <div className="mt-1 text-xs text-muted">{company.eta}</div>
                         </div>
+                        <ProgressBadge status={company.status} />
                       </div>
-                    ))}
-                  </div>
 
-                  <div className="mt-6 rounded-xl border border-border bg-white p-4">
-                    <div className="text-xs font-semibold text-muted">次のステップ</div>
-                    <div className="mt-1 text-sm font-medium text-navy">
-                      各社の見積もりがそろったら、価格と条件を比較できます
+                      <div className="mt-4 rounded-xl border border-cyan/20 bg-cyan/5 px-3 py-2 text-xs text-muted">
+                        {videoMeta
+                          ? "動画アップロード済みのため、この会社は動画内容を前提に確認を進めています。"
+                          : "動画未登録のため、見積確認に進めていません。"}
+                      </div>
                     </div>
-                  </div>
+                  ))}
+                </div>
 
-                  <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                    <Link
-                      href="/upload"
-                      className="inline-flex h-12 items-center justify-center rounded-lg border border-border bg-white px-5 text-sm font-semibold text-navy hover:bg-white/80"
-                    >
-                      戻る
-                    </Link>
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href="/upload"
+                    className="inline-flex h-12 items-center justify-center rounded-lg border border-border bg-white px-5 text-sm font-semibold text-navy hover:bg-white/80"
+                  >
+                    動画を再登録する
+                  </Link>
 
-                    <Link
-                      href="/quotes"
-                      className="inline-flex h-12 items-center justify-center rounded-lg bg-cyan px-5 text-sm font-semibold text-white transition hover:bg-[#0891B2]"
-                    >
-                      見積比較へ進む
-                    </Link>
-                  </div>
+                  <Link
+                    href="/quotes"
+                    className="inline-flex h-12 items-center justify-center rounded-lg bg-cyan px-5 text-sm font-semibold text-white transition hover:bg-[#0891B2]"
+                  >
+                    見積比較へ進む
+                  </Link>
+                </div>
+
+                <div className="mt-4 text-xs text-muted">
+                  デモでは進捗表示ですが、実運用では会社別の見積到着状況が更新されます。
                 </div>
               </div>
             </div>
@@ -153,59 +228,47 @@ export default function ProgressPage() {
   );
 }
 
-function StatCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "cyan" | "amber" | "gray";
-}) {
-  const toneClass =
-    tone === "cyan"
-      ? "border-cyan/30 bg-cyan/10 text-navy"
-      : tone === "amber"
-      ? "border-amber-300 bg-amber-50 text-amber-800"
-      : "border-border bg-white text-navy";
-
+function StatusMini({ title, value }: { title: string; value: string }) {
   return (
-    <div className={`rounded-xl border p-4 ${toneClass}`}>
-      <div className="text-xs font-semibold opacity-80">{label}</div>
-      <div className="mt-1 text-xl font-bold">{value}</div>
+    <div className="rounded-xl border border-white/60 bg-white p-4">
+      <div className="text-xs text-muted">{title}</div>
+      <div className="mt-1 text-sm font-semibold text-navy">{value}</div>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: Status }) {
-  if (status === "submitted") {
+function ProgressBadge({
+  status,
+}: {
+  status: "受付済み" | "動画確認中" | "見積作成中" | "提出完了";
+}) {
+  if (status === "提出完了") {
     return (
       <span className="inline-flex rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-semibold text-navy">
-        提出済み
+        提出完了
       </span>
     );
   }
 
-  if (status === "reviewing") {
+  if (status === "見積作成中") {
+    return (
+      <span className="inline-flex rounded-full border border-green-300 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+        見積作成中
+      </span>
+    );
+  }
+
+  if (status === "動画確認中") {
     return (
       <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-        確認中
+        動画確認中
       </span>
     );
   }
 
   return (
     <span className="inline-flex rounded-full border border-border bg-white px-3 py-1 text-xs font-semibold text-muted">
-      未提出
+      受付済み
     </span>
-  );
-}
-
-function FlowMini({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="rounded-xl border border-white/60 bg-white p-4">
-      <div className="text-sm font-semibold text-navy">{title}</div>
-      <div className="mt-2 text-xs leading-5 text-muted">{text}</div>
-    </div>
   );
 }
