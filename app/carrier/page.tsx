@@ -185,9 +185,7 @@ export default function CarrierPage() {
     loadVideo();
 
     return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [latestVideoMeta]);
 
@@ -303,6 +301,33 @@ export default function CarrierPage() {
               </div>
             </div>
 
+            <div className="mt-5 rounded-2xl border border-cyan/30 bg-cyan/10 p-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-navy">ユーザー動画登録状況</div>
+                  <div className="mt-2 text-2xl font-bold text-navy">
+                    {latestVideoMeta ? "動画アップロード済み" : "未アップロード"}
+                  </div>
+                  <div className="mt-1 text-sm text-muted">
+                    {latestVideoMeta
+                      ? `登録ファイル：${latestVideoMeta.fileName}`
+                      : "ユーザーがまだ動画を登録していません"}
+                  </div>
+                </div>
+
+                <span
+                  className={[
+                    "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                    latestVideoMeta
+                      ? "border-green-300 bg-green-50 text-green-700"
+                      : "border-border bg-white text-muted",
+                  ].join(" ")}
+                >
+                  {latestVideoMeta ? "見積確認可能" : "確認待ち"}
+                </span>
+              </div>
+            </div>
+
             <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.35fr]">
               <div className="space-y-4">
                 <div className="rounded-2xl border border-border bg-bg p-4">
@@ -331,6 +356,19 @@ export default function CarrierPage() {
                           </div>
                           <StatusBadge status={req.status} />
                         </div>
+
+                        <div className="mt-3">
+                          <span
+                            className={[
+                              "inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold",
+                              latestVideoMeta
+                                ? "border-green-300 bg-green-50 text-green-700"
+                                : "border-border bg-white text-muted",
+                            ].join(" ")}
+                          >
+                            {latestVideoMeta ? "動画アップロード済み" : "動画未登録"}
+                          </span>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -354,6 +392,29 @@ export default function CarrierPage() {
                           <div className="mt-1 text-sm text-muted">{selectedRequest.id}</div>
                         </div>
                         <StatusBadge status={selectedRequest.status} />
+                      </div>
+
+                      <div className="mt-4 rounded-xl border border-cyan/30 bg-cyan/10 p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <div className="text-sm font-semibold text-navy">動画登録状況</div>
+                            <div className="mt-1 text-sm text-muted">
+                              {latestVideoMeta
+                                ? "ユーザーの動画登録が完了しています"
+                                : "まだ動画が登録されていません"}
+                            </div>
+                          </div>
+                          <span
+                            className={[
+                              "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                              latestVideoMeta
+                                ? "border-green-300 bg-green-50 text-green-700"
+                                : "border-border bg-white text-muted",
+                            ].join(" ")}
+                          >
+                            {latestVideoMeta ? "アップロード済み" : "未登録"}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -382,6 +443,17 @@ export default function CarrierPage() {
                                 : "まだ動画はアップロードされていません"}
                             </div>
                           </div>
+
+                          <span
+                            className={[
+                              "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                              latestVideoMeta
+                                ? "border-green-300 bg-green-50 text-green-700"
+                                : "border-border bg-white text-muted",
+                            ].join(" ")}
+                          >
+                            {latestVideoMeta ? "動画アップロード済み" : "動画未登録"}
+                          </span>
                         </div>
 
                         <div className="mt-4 rounded-xl border border-border bg-white p-3">
@@ -396,7 +468,7 @@ export default function CarrierPage() {
                             />
                           ) : (
                             <div className="text-sm text-muted">
-                              動画データが見つかりません。ユーザー画面の /upload で動画アップロード後に確認できます。
+                              動画データが見つかりません。ユーザー画面の /video または /upload で動画登録後に確認できます。
                             </div>
                           )}
                         </div>
@@ -610,5 +682,3 @@ function SelectField({
     </label>
   );
 }
-// test
-// deploy trigger
