@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { getVideoBlob } from "../../lib/videoStore";
 
 type RequestStatus = "new" | "reviewing" | "quoted";
 
@@ -51,6 +52,14 @@ type ConfirmedOrder = {
   propertyName: string;
   handoffAt: string;
   status: string;
+};
+
+type LatestVideoMeta = {
+  id: string;
+  fileName: string;
+  fileType: string;
+  uploadedAt: string;
+  size: number;
 };
 
 const initialForm: QuoteForm = {
@@ -122,6 +131,9 @@ export default function CarrierPage() {
   const [selectedId, setSelectedId] = useState<string | null>(mockRequests[0]?.id ?? null);
   const [form, setForm] = useState<QuoteForm>(initialForm);
   const [confirmedOrders, setConfirmedOrders] = useState<ConfirmedOrder[]>([]);
+  const [latestVideoMeta, setLatestVideoMeta] = useState<LatestVideoMeta | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
 
   const selectedRequest = useMemo(
     () => requests.find((req) => req.id === selectedId) ?? null,
@@ -129,9 +141,55 @@ export default function CarrierPage() {
   );
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("movis_confirmed_orders") || "[]");
-    setConfirmedOrders(saved);
+    const savedOrders = JSON.parse(localStorage.getItem("movis_confirmed_orders") || "[]");
+    setConfirmedOrders(savedOrders);
+
+    const meta = localStorage.getItem("movis_latest_video_meta");
+    if (meta) {
+      try {
+        setLatestVideoMeta(JSON.parse(meta));
+      } catch {
+        // noop
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    let objectUrl = "";
+
+    const loadVideo = async () => {
+      if (!latestVideoMeta?.id) {
+        setVideoUrl("");
+        return;
+      }
+
+      try {
+        setIsLoadingVideo(true);
+        const blob = await getVideoBlob(latestVideoMeta.id);
+
+        if (!blob) {
+          setVideoUrl("");
+          return;
+        }
+
+        objectUrl = URL.createObjectURL(blob);
+        setVideoUrl(objectUrl);
+      } catch (error) {
+        console.error(error);
+        setVideoUrl("");
+      } finally {
+        setIsLoadingVideo(false);
+      }
+    };
+
+    loadVideo();
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [latestVideoMeta]);
 
   const updateForm = (key: keyof QuoteForm, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -234,7 +292,7 @@ export default function CarrierPage() {
                   Movis案件一覧と見積提出
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-muted md:text-base">
-                  ユーザーがアップロードした動画と条件を確認し、引越会社ごとに日程別の見積を提出します。
+                  ユーザーがアップロードした実動画と条件を確認し、引越会社ごとに日程別の見積を提出します。
                   発注確定後は、電話番号を含む連携情報が下部に反映されます。
                 </p>
               </div>
@@ -315,23 +373,40 @@ export default function CarrierPage() {
                       </div>
 
                       <div className="mt-4 rounded-xl border border-cyan/30 bg-cyan/10 p-4">
-                        <div className="text-sm font-semibold text-navy">動画情報</div>
-                        <div className="mt-2 text-sm text-muted">
-                          {selectedRequest.videoStatus}（デモでは動画プレビューは省略。実運用ではここで動画確認）
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="text-sm font-semibold text-navy">動画確認</div>
+                            <div className="mt-1 text-xs text-muted">
+                              {latestVideoMeta
+                                ? `最新動画：${latestVideoMeta.fileName}`
+                                : "まだ動画はアップロードされていません"}
+                            </div>
+                          </div>
                         </div>
-                        <button
-                          className="mt-4 inline-flex h-11 items-center justify-center rounded-lg border border-navy bg-white px-4 text-sm font-semibold text-navy hover:bg-bg"
-                          onClick={() => alert("動画プレビューは次フェーズで追加予定です。")}
-                        >
-                          動画を確認する
-                        </button>
+
+                        <div className="mt-4 rounded-xl border border-border bg-white p-3">
+                          {isLoadingVideo ? (
+                            <div className="text-sm text-muted">動画を読み込み中です...</div>
+                          ) : videoUrl ? (
+                            <video
+                              src={videoUrl}
+                              controls
+                              className="w-full rounded-lg"
+                              style={{ maxHeight: 360 }}
+                            />
+                          ) : (
+                            <div className="text-sm text-muted">
+                              動画データが見つかりません。ユーザー画面の /upload で動画アップロード後に確認できます。
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     <div className="rounded-2xl border border-border bg-white p-5 shadow-soft">
                       <div className="text-lg font-bold text-navy">見積提出</div>
                       <p className="mt-2 text-sm leading-6 text-muted">
-                        日程別に最大3案まで提示できます。ルート効率や社内事情は各社判断で反映してください。
+                        日程別に最大3案まで提示できます。動画を確認したうえで、各社判断で見積を提出してください。
                       </p>
 
                       <div className="mt-6 grid gap-4 md:grid-cols-2">
