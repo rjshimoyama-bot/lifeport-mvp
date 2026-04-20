@@ -1,82 +1,130 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { saveVideo } from "../../lib/videoStore";
 
-type Room = {
-  key: string;
-  title: string;
-  description: string;
-  aiTargets: string[];
-  checks: string[];
-};
-
-const ROOMS: Room[] = [
+const steps = [
   {
-    key: "entrance",
+    id: 1,
     title: "玄関",
     description: "玄関全体と、廊下の幅がわかるようにゆっくり撮影してください。",
-    aiTargets: ["靴箱", "廊下幅", "大型荷物", "玄関収納"],
-    checks: ["玄関全体が映っている", "廊下や通路の幅がわかる", "大きな荷物があれば映している"],
+    tags: ["靴箱", "廊下幅", "大型荷物", "玄関収納"],
+    checks: [
+      "玄関全体が映っている",
+      "廊下や通路の幅がわかる",
+      "大きな荷物があれば映している",
+    ],
   },
   {
-    key: "living",
+    id: 2,
     title: "リビング",
-    description: "家具がすべて見えるように、部屋を一周するように撮影してください。",
-    aiTargets: ["ソファ", "テレビ", "テレビ台", "テーブル", "本棚"],
-    checks: ["部屋全体を一周している", "大きな家具が映っている", "床面積がわかるように撮影している"],
+    description: "家具の配置と全体の広さがわかるように、部屋を一周するように撮影してください。",
+    tags: ["ソファ", "テレビ台", "テーブル", "収納"],
+    checks: [
+      "部屋の全体感がわかる",
+      "大型家具が映っている",
+      "床に置いてある荷物も確認できる",
+    ],
   },
   {
-    key: "bedroom",
+    id: 3,
     title: "寝室",
-    description: "ベッドやタンス、クローゼットの中までわかるように撮影してください。",
-    aiTargets: ["ベッド", "マットレス", "タンス", "衣装ケース", "クローゼット"],
-    checks: ["ベッドが映っている", "収納家具が映っている", "クローゼット内部を映している"],
+    description: "ベッド、タンス、衣装ケースなどを中心に撮影してください。",
+    tags: ["ベッド", "タンス", "衣装ケース", "寝具"],
+    checks: [
+      "ベッドサイズがわかる",
+      "収納家具が映っている",
+      "追加荷物があれば映っている",
+    ],
   },
   {
-    key: "kitchen",
+    id: 4,
     title: "キッチン",
-    description: "冷蔵庫、棚、食器棚などを中心に撮影してください。",
-    aiTargets: ["冷蔵庫", "電子レンジ", "食器棚", "キッチン収納"],
-    checks: ["冷蔵庫が映っている", "食器棚や棚が映っている", "キッチン全体がわかる"],
+    description: "冷蔵庫、食器棚、電子レンジ台などを撮影してください。",
+    tags: ["冷蔵庫", "食器棚", "家電", "ラック"],
+    checks: [
+      "冷蔵庫が映っている",
+      "棚やラックが映っている",
+      "キッチン家電が把握できる",
+    ],
   },
   {
-    key: "washroom",
-    title: "洗面所",
-    description: "洗濯機や収納棚がわかるように撮影してください。",
-    aiTargets: ["洗濯機", "乾燥機", "洗面棚"],
-    checks: ["洗濯機が映っている", "収納棚が映っている", "スペース全体がわかる"],
+    id: 5,
+    title: "洗面・浴室まわり",
+    description: "洗濯機やラックなど、搬出が必要なものを撮影してください。",
+    tags: ["洗濯機", "棚", "収納", "脱衣所"],
+    checks: [
+      "洗濯機が映っている",
+      "周辺収納が映っている",
+      "狭さ・動線が確認できる",
+    ],
   },
   {
-    key: "balcony",
-    title: "バルコニー・収納",
-    description: "バルコニーや外置き荷物、追加の収納スペースがあれば撮影してください。",
-    aiTargets: ["物置", "自転車", "段ボール", "外置き家具"],
-    checks: ["バルコニーや収納が映っている", "大きな荷物があれば映している", "追加スペースがわかる"],
+    id: 6,
+    title: "最後に全体確認",
+    description: "撮り漏れがないか確認し、最後に部屋全体を簡単に見直してください。",
+    tags: ["撮り漏れ防止", "全体確認", "最終チェック"],
+    checks: [
+      "主要な部屋をすべて撮影した",
+      "大型家具を撮影した",
+      "通路や搬出条件も確認できる",
+    ],
   },
 ];
 
 export default function VideoPage() {
-  const [idx, setIdx] = useState(0);
-  const [roomChecks, setRoomChecks] = useState<Record<string, Record<string, boolean>>>({});
+  const [currentStep, setCurrentStep] = useState(0);
+  const [checkedItems, setCheckedItems] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const room = ROOMS[idx];
-  const total = ROOMS.length;
-  const progress = Math.round(((idx + 1) / total) * 100);
+  const current = steps[currentStep];
+  const progress = Math.round(((currentStep + 1) / steps.length) * 100);
 
-  const currentChecks = roomChecks[room.key] ?? {};
-  const allChecked = useMemo(() => {
-    return room.checks.every((item) => currentChecks[item] === true);
-  }, [room.checks, currentChecks]);
+  const canMoveNext = useMemo(() => checkedItems.length > 0, [checkedItems.length]);
 
-  const toggleCheck = (label: string, checked: boolean) => {
-    setRoomChecks((prev) => ({
-      ...prev,
-      [room.key]: {
-        ...(prev[room.key] ?? {}),
-        [label]: checked,
-      },
-    }));
+  const toggleCheck = (item: string) => {
+    setCheckedItems((prev) =>
+      prev.includes(item) ? prev.filter((v) => v !== item) : [...prev, item]
+    );
+  };
+
+  const goNextStep = () => {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep((prev) => prev + 1);
+      setCheckedItems([]);
+    }
+  };
+
+  const goPrevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep((prev) => prev - 1);
+      setCheckedItems([]);
+    }
+  };
+
+  const openCamera = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleVideoSelected = async (file: File | null) => {
+    if (!file) return;
+
+    try {
+      setIsSaving(true);
+
+      const saved = await saveVideo(file);
+      localStorage.setItem("movis_latest_video_meta", JSON.stringify(saved));
+
+      alert("動画を保存しました。見積進捗画面へ進みます。");
+      window.location.href = "/progress";
+    } catch (error) {
+      console.error(error);
+      alert("動画の保存に失敗しました。");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -91,197 +139,177 @@ export default function VideoPage() {
 
         <section className="mt-8">
           <div className="rounded-2xl border border-border bg-white p-6 shadow-soft md:p-8">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="max-w-2xl">
-                <h1 className="text-2xl font-bold text-navy md:text-3xl">
-                  3〜5分で完了する、Movis動画査定
-                </h1>
-                <p className="mt-3 text-sm leading-6 text-muted md:text-base">
-                  ガイドに沿って部屋を撮影するだけで、引越し見積もりに必要な情報をまとめて伝えられます。
-                  訪問見積もりの代わりに、Movis AIが物量を整理します。
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-cyan/30 bg-cyan/10 px-4 py-3">
-                <div className="text-xs text-muted">撮影ステップ</div>
-                <div className="mt-1 text-lg font-bold text-navy">
-                  {idx + 1} / {total}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <div className="h-2 w-full rounded-full bg-border">
-                <div
-                  className="h-2 rounded-full bg-cyan transition-all"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <div className="mt-2 text-xs text-muted">進行状況 {progress}%</div>
-            </div>
-
-            <div className="mt-8 grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
-              <div className="rounded-2xl border border-border bg-white p-5">
-                <div className="flex items-center gap-3">
-                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-cyan/10 text-sm font-bold text-cyan">
-                    {idx + 1}
-                  </div>
+            <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+              <div>
+                <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-xl font-bold text-navy">{room.title}</div>
-                    <div className="text-sm text-muted">このエリアを撮影してください</div>
+                    <h1 className="text-2xl font-bold text-navy md:text-3xl">
+                      3〜5分で完了する、Movis動画査定
+                    </h1>
+                    <p className="mt-3 text-sm leading-6 text-muted md:text-base">
+                      ガイドに沿って部屋を撮影するだけで、引越し見積もりに必要な情報をまとめて伝えられます。
+                      訪問見積もりの代わりに、Movis上で各社が動画を確認します。
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-cyan/30 bg-cyan/10 px-5 py-4 text-center">
+                    <div className="text-xs text-muted">撮影ステップ</div>
+                    <div className="mt-1 text-2xl font-bold text-navy">
+                      {currentStep + 1} / {steps.length}
+                    </div>
                   </div>
                 </div>
 
-                <p className="mt-4 text-sm leading-6 text-muted">
-                  {room.description}
-                </p>
-
-                <div className="mt-5 rounded-xl border border-border bg-bg p-4">
-                  <div className="text-sm font-semibold text-navy">Movis AI が見ているポイント</div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {room.aiTargets.map((target) => (
-                      <span
-                        key={target}
-                        className="inline-flex rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-medium text-navy"
-                      >
-                        {target}
-                      </span>
-                    ))}
+                <div className="mt-6">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-border">
+                    <div
+                      className="h-full rounded-full bg-cyan transition-all"
+                      style={{ width: `${progress}%` }}
+                    />
                   </div>
+                  <div className="mt-2 text-xs text-muted">進行状況 {progress}%</div>
                 </div>
 
-                <div className="mt-5 rounded-xl border border-border bg-bg p-4">
-                  <div className="text-sm font-semibold text-navy">撮影チェック</div>
-                  <div className="mt-3 space-y-3">
-                    {room.checks.map((item) => (
-                      <label key={item} className="flex items-start gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="mt-1 h-5 w-5 accent-[#06B6D4]"
-                          checked={currentChecks[item] === true}
-                          onChange={(e) => toggleCheck(item, e.target.checked)}
-                        />
-                        <span className="text-sm leading-6 text-navy">{item}</span>
-                      </label>
-                    ))}
+                <div className="mt-8 rounded-2xl border border-border bg-bg p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan/10 text-sm font-bold text-navy">
+                      {current.id}
+                    </div>
+
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-bold text-navy">{current.title}</h2>
+                      <p className="mt-2 text-sm leading-6 text-muted">
+                        {current.description}
+                      </p>
+
+                      <div className="mt-6 rounded-2xl border border-border bg-white p-4">
+                        <div className="text-sm font-semibold text-navy">
+                          Movisが確認したいポイント
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {current.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-semibold text-navy"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="mt-5 rounded-2xl border border-border bg-white p-4">
+                        <div className="text-sm font-semibold text-navy">撮影チェック</div>
+                        <div className="mt-3 space-y-3">
+                          {current.checks.map((item) => (
+                            <label key={item} className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                className="h-5 w-5 accent-[#06B6D4]"
+                                checked={checkedItems.includes(item)}
+                                onChange={() => toggleCheck(item)}
+                              />
+                              <span className="text-sm text-navy">{item}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                        <button
+                          onClick={openCamera}
+                          disabled={isSaving}
+                          className={[
+                            "inline-flex h-12 items-center justify-center rounded-lg px-5 text-sm font-semibold transition",
+                            isSaving
+                              ? "pointer-events-none bg-border text-muted"
+                              : "bg-cyan text-white hover:bg-[#0891B2]",
+                          ].join(" ")}
+                        >
+                          {isSaving ? "保存中..." : "撮影して保存する"}
+                        </button>
+
+                        <button
+                          onClick={goNextStep}
+                          disabled={!canMoveNext || currentStep === steps.length - 1}
+                          className={[
+                            "inline-flex h-12 items-center justify-center rounded-lg px-5 text-sm font-semibold transition",
+                            canMoveNext && currentStep !== steps.length - 1
+                              ? "border border-border bg-white text-navy hover:bg-bg"
+                              : "pointer-events-none border border-border bg-white text-muted",
+                          ].join(" ")}
+                        >
+                          次の撮影ステップへ
+                        </button>
+
+                        <button
+                          onClick={goPrevStep}
+                          disabled={currentStep === 0}
+                          className={[
+                            "inline-flex h-12 items-center justify-center rounded-lg px-5 text-sm font-semibold transition",
+                            currentStep > 0
+                              ? "border border-border bg-white text-navy hover:bg-bg"
+                              : "pointer-events-none border border-border bg-white text-muted",
+                          ].join(" ")}
+                        >
+                          戻る
+                        </button>
+                      </div>
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="video/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => handleVideoSelected(e.target.files?.[0] ?? null)}
+                      />
+                    </div>
                   </div>
-                </div>
-
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                  <button
-                    className="inline-flex h-12 items-center justify-center rounded-lg border border-navy bg-white px-5 text-sm font-semibold text-navy hover:bg-bg"
-                    onClick={() =>
-                      alert("MVPではカメラ起動は省略しています。実運用ではスマホでそのまま撮影できるようにします。")
-                    }
-                  >
-                    撮影する（デモ）
-                  </button>
-
-                  <button
-                    className="inline-flex h-12 items-center justify-center rounded-lg border border-border bg-white px-5 text-sm font-semibold text-navy hover:bg-bg"
-                    onClick={() =>
-                      alert("一時保存しました（デモ）。実運用では途中保存して後から再開できます。")
-                    }
-                  >
-                    一時保存
-                  </button>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="rounded-2xl border border-cyan/30 bg-cyan/10 p-5">
-                  <div className="text-sm font-semibold text-navy">撮影の目安</div>
-                  <div className="mt-3 space-y-2 text-sm leading-6 text-muted">
-                    <div>・全体で約3〜5分</div>
-                    <div>・1部屋あたり30秒前後</div>
-                    <div>・家具がすべて見えるようにゆっくり撮影</div>
-                  </div>
+                  <div className="text-lg font-bold text-navy">撮影の目安</div>
+                  <ul className="mt-4 space-y-2 text-sm leading-6 text-muted">
+                    <li>・全体で約3〜5分</li>
+                    <li>・1部屋あたり30秒前後</li>
+                    <li>・家具がすべて見えるようにゆっくり撮影</li>
+                  </ul>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-bg p-5">
+                  <div className="text-lg font-bold text-navy">撮影のコツ</div>
+                  <ul className="mt-4 space-y-2 text-sm leading-6 text-muted">
+                    <li>・部屋を一周するように撮る</li>
+                    <li>・大型家具は近づいて撮る</li>
+                    <li>・通路や玄関も忘れずに映す</li>
+                    <li>・逆光や暗さに注意する</li>
+                  </ul>
                 </div>
 
                 <div className="rounded-2xl border border-border bg-white p-5">
-                  <div className="text-sm font-semibold text-navy">Movis AI査定イメージ</div>
-                  <div className="mt-4 space-y-3">
-                    <AiBox title="荷物量" value="標準〜やや多め" />
-                    <AiBox title="想定作業人数" value="2名" />
-                    <AiBox title="想定トラック" value="2tクラス" />
+                  <div className="text-lg font-bold text-navy">補足</div>
+                  <p className="mt-3 text-sm leading-6 text-muted">
+                    スマホでは「撮影して保存する」を押すとカメラまたは動画選択画面が開きます。
+                    保存後はそのまま見積進捗画面に進みます。
+                  </p>
+
+                  <div className="mt-5">
+                    <Link
+                      href="/upload"
+                      className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-bg px-4 text-sm font-semibold text-navy hover:bg-white"
+                    >
+                      既存の動画をアップロードする
+                    </Link>
                   </div>
                 </div>
-
-                <div className="rounded-2xl border border-border bg-white p-5">
-                  <div className="text-sm font-semibold text-navy">撮影のコツ</div>
-                  <div className="mt-3 space-y-2 text-sm leading-6 text-muted">
-                    <div>・部屋を一周するように撮る</div>
-                    <div>・大型家具は近づいて撮る</div>
-                    <div>・収納の中も簡単に映す</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {!allChecked && (
-              <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
-                このステップのチェックが完了すると、次の部屋へ進めます。
-              </div>
-            )}
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
-              <Link
-                href="/schedule"
-                className="inline-flex h-12 items-center justify-center rounded-lg border border-border bg-white px-5 text-sm font-semibold text-navy hover:bg-bg"
-              >
-                戻る
-              </Link>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  className={[
-                    "inline-flex h-12 items-center justify-center rounded-lg border border-navy bg-white px-5 text-sm font-semibold text-navy hover:bg-bg",
-                    idx === 0 ? "pointer-events-none opacity-40" : "",
-                  ].join(" ")}
-                  onClick={() => setIdx((prev) => Math.max(0, prev - 1))}
-                >
-                  前のステップ
-                </button>
-
-                {idx < total - 1 ? (
-                  <button
-                    className={[
-                      "inline-flex h-12 items-center justify-center rounded-lg px-5 text-sm font-semibold",
-                      allChecked
-                        ? "bg-cyan text-white hover:bg-[#0891B2]"
-                        : "pointer-events-none bg-border text-muted",
-                    ].join(" ")}
-                    onClick={() => setIdx((prev) => Math.min(total - 1, prev + 1))}
-                  >
-                    次の部屋へ
-                  </button>
-                ) : (
-                  <Link
-                    href="/upload"
-                    className={[
-                      "inline-flex h-12 items-center justify-center rounded-lg px-5 text-sm font-semibold",
-                      allChecked
-                        ? "bg-cyan text-white hover:bg-[#0891B2]"
-                        : "pointer-events-none bg-border text-muted",
-                    ].join(" ")}
-                  >
-                    アップロードへ進む
-                  </Link>
-                )}
               </div>
             </div>
           </div>
         </section>
       </div>
     </main>
-  );
-}
-
-function AiBox({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-bg p-3">
-      <div className="text-xs text-muted">{title}</div>
-      <div className="mt-1 text-sm font-semibold text-navy">{value}</div>
-    </div>
   );
 }
