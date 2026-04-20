@@ -7,7 +7,6 @@ import { seedQuotes } from "../../lib/mock";
 import { formatJPY } from "../../lib/format";
 
 type SortMode = "recommended" | "price";
-type ViewMode = "submitted" | "mixed" | "mock";
 
 type SubmittedQuote = {
   companyId: string;
@@ -21,24 +20,25 @@ type SubmittedQuote = {
     crew: number;
     boxes: number;
     insurance: string;
-    hint: string;
+    hint?: string;
   }[];
+  truck?: string;
+  insurance?: string;
+};
+
+type LatestVideoMeta = {
+  id: string;
+  fileName: string;
+  fileType: string;
+  uploadedAt: string;
+  size: number;
 };
 
 export default function QuotesPage() {
   const [sort, setSort] = useState<SortMode>("recommended");
-  const [viewMode, setViewMode] = useState<ViewMode>("mixed");
   const [selected, setSelected] = useState<{ companyId: string; optionId: string } | null>(null);
   const [bundles, setBundles] = useState<QuoteBundle[]>([]);
-  const [selectedQuote, setSelectedQuote] = useState<{
-    company: string;
-    plan: string;
-    price: string;
-    crew: string;
-    truck: string;
-    insurance: string;
-    note: string;
-  } | null>(null);
+  const [latestVideoMeta, setLatestVideoMeta] = useState<LatestVideoMeta | null>(null);
 
   useEffect(() => {
     const primaryDate =
@@ -51,40 +51,42 @@ export default function QuotesPage() {
     const timeband =
       (localStorage.getItem("lp_timeband") as "am" | "pm" | "all") || "all";
 
-    const baseQuotes = seedQuotes({ primaryDate, window: windowValue, timeband });
-
-    const submittedQuotes: SubmittedQuote[] = JSON.parse(
+    const submittedQuotes = JSON.parse(
       localStorage.getItem("movis_submitted_quotes") || "[]"
-    );
+    ) as SubmittedQuote[];
 
-    const convertedSubmitted = submittedQuotes.map((item) => ({
-      company: {
-        id: item.companyId,
-        name: item.companyName,
-        note: item.companyNote,
-      },
-      rating: item.rating,
-      options: item.options,
-      basePriceMin: Math.min(...item.options.map((o) => o.price)),
-    })) as QuoteBundle[];
-
-    if (viewMode === "submitted") {
-      setBundles(convertedSubmitted);
-    } else if (viewMode === "mock") {
-      setBundles(baseQuotes);
-    } else {
-      setBundles([...convertedSubmitted, ...baseQuotes]);
-    }
-
-    const savedQuote = localStorage.getItem("movis_selected_quote");
-    if (savedQuote) {
+    const hasVideoMeta = localStorage.getItem("movis_latest_video_meta");
+    if (hasVideoMeta) {
       try {
-        setSelectedQuote(JSON.parse(savedQuote));
+        setLatestVideoMeta(JSON.parse(hasVideoMeta));
       } catch {
-        setSelectedQuote(null);
+        // noop
       }
     }
-  }, [viewMode]);
+
+    const mockBundles = seedQuotes({
+      primaryDate,
+      window: windowValue,
+      timeband,
+    });
+
+    const submittedBundles: QuoteBundle[] = submittedQuotes.map((sq) => ({
+      company: {
+        id: sq.companyId,
+        name: sq.companyName,
+        note: sq.companyNote,
+      },
+      rating: sq.rating,
+      options: sq.options.map((o) => ({
+        ...o,
+        hint: o.hint || "この見積は動画確認後に作成された見積です。",
+      })),
+      basePriceMin: Math.min(...sq.options.map((o) => o.price)),
+    }));
+
+    const merged = [...submittedBundles, ...mockBundles];
+    setBundles(merged);
+  }, []);
 
   const sorted = useMemo(() => {
     const copy = [...bundles];
@@ -103,6 +105,8 @@ export default function QuotesPage() {
     if (!b || !o) return null;
     return { b, o };
   }, [bundles, selected]);
+
+  const hasUploadedVideo = !!latestVideoMeta;
 
   return (
     <main className="min-h-screen bg-bg">
@@ -127,35 +131,46 @@ export default function QuotesPage() {
                 </p>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-medium text-navy hover:bg-bg"
-                  onClick={() => setSort((v) => (v === "recommended" ? "price" : "recommended"))}
-                >
-                  並び替え：{sort === "recommended" ? "おすすめ順" : "価格順"}
-                </button>
-
-                <select
-                  className="h-11 rounded-lg border border-border bg-white px-4 text-sm font-medium text-navy"
-                  value={viewMode}
-                  onChange={(e) => setViewMode(e.target.value as ViewMode)}
-                >
-                  <option value="mixed">表示：提出＋モック</option>
-                  <option value="submitted">表示：提出見積のみ</option>
-                  <option value="mock">表示：モックのみ</option>
-                </select>
-              </div>
+              <button
+                className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-medium text-navy hover:bg-bg"
+                onClick={() => setSort((v) => (v === "recommended" ? "price" : "recommended"))}
+              >
+                並び替え：{sort === "recommended" ? "おすすめ順" : "価格順"}
+              </button>
             </div>
 
-            {selectedQuote && (
-              <div className="mt-6 rounded-xl border border-cyan bg-cyan/10 p-4">
-                <div className="text-sm text-muted">選択中の見積</div>
-                <div className="text-navy font-semibold">{selectedQuote.company}</div>
-                <div className="text-sm text-muted">
-                  {selectedQuote.plan} / {selectedQuote.price}
+            <div className="mt-5 rounded-xl border border-cyan/30 bg-cyan/10 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-navy">見積の前提情報</div>
+                  <div className="mt-1 text-sm text-muted">
+                    {hasUploadedVideo
+                      ? "アップロード済み動画をもとに、各社が見積作成を進めています。"
+                      : "動画未登録のため、一部の見積はデモ用表示を含みます。"}
+                  </div>
                 </div>
+
+                <span
+                  className={[
+                    "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                    hasUploadedVideo
+                      ? "border-green-300 bg-green-50 text-green-700"
+                      : "border-border bg-white text-muted",
+                  ].join(" ")}
+                >
+                  {hasUploadedVideo ? "動画アップロード済み" : "動画未登録"}
+                </span>
               </div>
-            )}
+
+              {latestVideoMeta && (
+                <div className="mt-3 rounded-xl border border-white/60 bg-white p-3">
+                  <div className="text-xs text-muted">確認対象動画</div>
+                  <div className="mt-1 text-sm font-semibold text-navy">
+                    {latestVideoMeta.fileName}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="mt-5 rounded-xl border border-cyan/30 bg-cyan/10 p-4">
               <div className="text-sm font-semibold text-navy">Movis AI 査定</div>
@@ -171,40 +186,15 @@ export default function QuotesPage() {
             </div>
 
             <div className="mt-8 space-y-5">
-              {sorted.length === 0 ? (
-                <div className="rounded-2xl border border-border bg-bg p-8 text-center text-muted">
-                  まだ提出された見積がありません。
-                </div>
-              ) : (
-                sorted.map((b, index) => (
-                  <QuoteCard
-                    key={b.company.id}
-                    bundle={b}
-                    rank={index}
-                    onChoose={(companyId, optionId) => {
-                      setSelected({ companyId, optionId });
-
-                      const bundle = bundles.find((item) => item.company.id === companyId);
-                      const option = bundle?.options.find((item) => item.id === optionId);
-
-                      if (bundle && option) {
-                        const saved = {
-                          company: bundle.company.name,
-                          plan: option.label,
-                          price: formatJPY(option.price),
-                          crew: `${option.crew}名`,
-                          truck: "2tクラス",
-                          insurance: option.insurance,
-                          note: option.hint || "条件の良い見積もり候補です。",
-                        };
-
-                        localStorage.setItem("movis_selected_quote", JSON.stringify(saved));
-                        setSelectedQuote(saved);
-                      }
-                    }}
-                  />
-                ))
-              )}
+              {sorted.map((b, index) => (
+                <QuoteCard
+                  key={b.company.id}
+                  bundle={b}
+                  rank={index}
+                  onChoose={(companyId, optionId) => setSelected({ companyId, optionId })}
+                  hasUploadedVideo={hasUploadedVideo}
+                />
+              ))}
             </div>
 
             {chosen && (
@@ -253,10 +243,12 @@ function QuoteCard({
   bundle,
   rank,
   onChoose,
+  hasUploadedVideo,
 }: {
   bundle: QuoteBundle;
   rank: number;
   onChoose: (companyId: string, optionId: string) => void;
+  hasUploadedVideo: boolean;
 }) {
   const [active, setActive] = useState(bundle.options[0]?.id ?? "");
   const option = bundle.options.find((o) => o.id === active) ?? bundle.options[0];
@@ -279,6 +271,11 @@ function QuoteCard({
                 {tag.label}
               </span>
             )}
+            {hasUploadedVideo && (
+              <span className="inline-flex rounded-full border border-green-300 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                動画確認後の見積
+              </span>
+            )}
           </div>
           <div className="mt-2 text-sm text-muted">
             評価：★{bundle.rating.toFixed(1)} ／ {bundle.company.note}
@@ -290,6 +287,12 @@ function QuoteCard({
           <div className="mt-1 text-2xl font-bold text-navy">{formatJPY(bundle.basePriceMin)}</div>
         </div>
       </div>
+
+      {hasUploadedVideo && (
+        <div className="mt-4 rounded-xl border border-green-300 bg-green-50 p-4 text-sm leading-6 text-green-800">
+          この見積は動画確認後に作成された見積です。
+        </div>
+      )}
 
       <div className="mt-5 overflow-x-auto">
         <div className="flex min-w-max gap-2">
@@ -339,7 +342,23 @@ function QuoteCard({
 
         <button
           className="inline-flex h-12 items-center justify-center rounded-lg bg-cyan px-5 text-sm font-semibold text-white hover:bg-[#0891B2]"
-          onClick={() => onChoose(bundle.company.id, option.id)}
+          onClick={() => {
+            localStorage.setItem(
+              "movis_selected_quote",
+              JSON.stringify({
+                company: bundle.company.name,
+                plan: option.label,
+                price: formatJPY(option.price),
+                crew: `${option.crew}名`,
+                truck: "2tクラス",
+                insurance: option.insurance,
+                note: hasUploadedVideo
+                  ? "この見積は動画確認後に作成された見積です。"
+                  : option.hint || "条件の良い見積もり候補です。",
+              })
+            );
+            onChoose(bundle.company.id, option.id);
+          }}
         >
           この日程で選ぶ
         </button>
