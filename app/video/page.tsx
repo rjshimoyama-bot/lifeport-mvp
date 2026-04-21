@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
-import { saveVideo } from "../../lib/videoStore";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { listVideos, saveVideo, type StoredVideoMeta } from "../../lib/videoStore";
 
 const steps = [
   {
@@ -77,12 +77,37 @@ export default function VideoPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [checkedItems, setCheckedItems] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [savedVideos, setSavedVideos] = useState<StoredVideoMeta[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const current = steps[currentStep];
   const progress = Math.round(((currentStep + 1) / steps.length) * 100);
 
-  const canMoveNext = useMemo(() => checkedItems.length > 0, [checkedItems.length]);
+  const stepVideos = useMemo(
+    () => savedVideos.filter((v) => v.stepId === current.id),
+    [savedVideos, current.id]
+  );
+
+  const totalSavedSteps = useMemo(() => {
+    return new Set(savedVideos.map((v) => v.stepId).filter(Boolean)).size;
+  }, [savedVideos]);
+
+  const canMoveNext = useMemo(() => {
+    return checkedItems.length > 0;
+  }, [checkedItems.length]);
+
+  useEffect(() => {
+    refreshSavedVideos();
+  }, []);
+
+  const refreshSavedVideos = async () => {
+    try {
+      const all = await listVideos();
+      setSavedVideos(all);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const toggleCheck = (item: string) => {
     setCheckedItems((prev) =>
@@ -114,17 +139,38 @@ export default function VideoPage() {
     try {
       setIsSaving(true);
 
-      const saved = await saveVideo(file);
-      localStorage.setItem("movis_latest_video_meta", JSON.stringify(saved));
+      const saved = await saveVideo(file, {
+        stepId: current.id,
+        stepTitle: current.title,
+      });
 
-      alert("動画を保存しました。見積進捗画面へ進みます。");
-      window.location.href = "/progress";
+      const latestMeta = {
+        id: saved.id,
+        fileName: saved.fileName,
+        fileType: saved.fileType,
+        uploadedAt: saved.uploadedAt,
+        size: saved.size,
+      };
+
+      localStorage.setItem("movis_latest_video_meta", JSON.stringify(latestMeta));
+      await refreshSavedVideos();
+
+      alert(`「${current.title}」の動画を保存しました。`);
     } catch (error) {
       console.error(error);
       alert("動画の保存に失敗しました。");
     } finally {
       setIsSaving(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const goToProgress = () => {
+    if (savedVideos.length === 0) {
+      alert("少なくとも1本は動画を保存してください。");
+      return;
+    }
+    window.location.href = "/progress";
   };
 
   return (
@@ -144,11 +190,11 @@ export default function VideoPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h1 className="text-2xl font-bold text-navy md:text-3xl">
-                      3〜5分で完了する、Movis動画査定
+                      ステップごとに保存できる、Movis動画査定
                     </h1>
                     <p className="mt-3 text-sm leading-6 text-muted md:text-base">
-                      ガイドに沿って部屋を撮影するだけで、引越し見積もりに必要な情報をまとめて伝えられます。
-                      訪問見積もりの代わりに、Movis上で各社が動画を確認します。
+                      各エリアごとに動画を保存できます。撮影しながら段階的に登録し、
+                      最後に見積進捗画面へ進みます。
                     </p>
                   </div>
 
@@ -168,6 +214,28 @@ export default function VideoPage() {
                     />
                   </div>
                   <div className="mt-2 text-xs text-muted">進行状況 {progress}%</div>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-cyan/30 bg-cyan/10 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-navy">保存状況</div>
+                      <div className="mt-1 text-sm text-muted">
+                        保存済みステップ数：{totalSavedSteps} / {steps.length}
+                      </div>
+                    </div>
+
+                    <span
+                      className={[
+                        "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                        stepVideos.length > 0
+                          ? "border-green-300 bg-green-50 text-green-700"
+                          : "border-border bg-white text-muted",
+                      ].join(" ")}
+                    >
+                      {stepVideos.length > 0 ? "このステップは保存済み" : "未保存"}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mt-8 rounded-2xl border border-border bg-bg p-5">
@@ -215,7 +283,34 @@ export default function VideoPage() {
                         </div>
                       </div>
 
-                      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                      <div className="mt-5 rounded-2xl border border-border bg-white p-4">
+                        <div className="text-sm font-semibold text-navy">このステップの保存済み動画</div>
+
+                        {stepVideos.length === 0 ? (
+                          <div className="mt-3 text-sm text-muted">
+                            まだ保存されていません。
+                          </div>
+                        ) : (
+                          <div className="mt-3 space-y-2">
+                            {stepVideos.map((video) => (
+                              <div
+                                key={video.id}
+                                className="rounded-xl border border-green-300 bg-green-50 px-4 py-3"
+                              >
+                                <div className="text-sm font-semibold text-green-700">
+                                  保存済み
+                                </div>
+                                <div className="mt-1 text-sm text-navy">{video.fileName}</div>
+                                <div className="mt-1 text-xs text-muted">
+                                  約{Math.round((video.size / 1024 / 1024) * 100) / 100} MB
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                         <button
                           onClick={openCamera}
                           disabled={isSaving}
@@ -226,7 +321,7 @@ export default function VideoPage() {
                               : "bg-cyan text-white hover:bg-[#0891B2]",
                           ].join(" ")}
                         >
-                          {isSaving ? "保存中..." : "撮影して保存する"}
+                          {isSaving ? "保存中..." : `「${current.title}」を撮影して保存`}
                         </button>
 
                         <button
@@ -254,6 +349,13 @@ export default function VideoPage() {
                         >
                           戻る
                         </button>
+
+                        <button
+                          onClick={goToProgress}
+                          className="inline-flex h-12 items-center justify-center rounded-lg border border-navy bg-white px-5 text-sm font-semibold text-navy hover:bg-bg"
+                        >
+                          ここまで保存して進捗へ進む
+                        </button>
                       </div>
 
                       <input
@@ -274,26 +376,26 @@ export default function VideoPage() {
                   <div className="text-lg font-bold text-navy">撮影の目安</div>
                   <ul className="mt-4 space-y-2 text-sm leading-6 text-muted">
                     <li>・全体で約3〜5分</li>
-                    <li>・1部屋あたり30秒前後</li>
+                    <li>・1ステップごとに区切って保存可能</li>
                     <li>・家具がすべて見えるようにゆっくり撮影</li>
                   </ul>
                 </div>
 
                 <div className="rounded-2xl border border-border bg-bg p-5">
-                  <div className="text-lg font-bold text-navy">撮影のコツ</div>
+                  <div className="text-lg font-bold text-navy">保存の考え方</div>
                   <ul className="mt-4 space-y-2 text-sm leading-6 text-muted">
-                    <li>・部屋を一周するように撮る</li>
-                    <li>・大型家具は近づいて撮る</li>
-                    <li>・通路や玄関も忘れずに映す</li>
-                    <li>・逆光や暗さに注意する</li>
+                    <li>・玄関だけ先に保存</li>
+                    <li>・次にリビングを保存</li>
+                    <li>・最後に全体確認を保存</li>
+                    <li>・複数本に分けて登録可能</li>
                   </ul>
                 </div>
 
                 <div className="rounded-2xl border border-border bg-white p-5">
                   <div className="text-lg font-bold text-navy">補足</div>
                   <p className="mt-3 text-sm leading-6 text-muted">
-                    スマホでは「撮影して保存する」を押すとカメラまたは動画選択画面が開きます。
-                    保存後はそのまま見積進捗画面に進みます。
+                    スマホでは「撮影して保存」を押すとカメラまたは動画選択画面が開きます。
+                    ステップごとに保存しながら進められます。
                   </p>
 
                   <div className="mt-5">
@@ -304,6 +406,42 @@ export default function VideoPage() {
                       既存の動画をアップロードする
                     </Link>
                   </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-white p-5">
+                  <div className="text-lg font-bold text-navy">保存済みステップ一覧</div>
+
+                  {savedVideos.length === 0 ? (
+                    <div className="mt-3 text-sm text-muted">
+                      まだ保存された動画はありません。
+                    </div>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {steps.map((step) => {
+                        const count = savedVideos.filter((v) => v.stepId === step.id).length;
+                        return (
+                          <div
+                            key={step.id}
+                            className="flex items-center justify-between rounded-xl border border-border bg-bg px-4 py-3"
+                          >
+                            <div className="text-sm font-medium text-navy">
+                              {step.id}. {step.title}
+                            </div>
+                            <span
+                              className={[
+                                "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                                count > 0
+                                  ? "border-green-300 bg-green-50 text-green-700"
+                                  : "border-border bg-white text-muted",
+                              ].join(" ")}
+                            >
+                              {count > 0 ? `${count}本保存済み` : "未保存"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
