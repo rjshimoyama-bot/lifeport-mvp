@@ -7,6 +7,7 @@ import { seedQuotes } from "../../lib/mock";
 import { formatJPY } from "../../lib/format";
 
 type SortMode = "recommended" | "price";
+type InsuranceType = "あり" | "簡易" | "なし";
 
 type SubmittedQuote = {
   companyId: string;
@@ -19,11 +20,11 @@ type SubmittedQuote = {
     price: number;
     crew: number;
     boxes: number;
-    insurance: string;
+    insurance: InsuranceType;
     hint?: string;
   }[];
   truck?: string;
-  insurance?: string;
+  insurance?: InsuranceType;
 };
 
 type LatestVideoMeta = {
@@ -33,6 +34,11 @@ type LatestVideoMeta = {
   uploadedAt: string;
   size: number;
 };
+
+function normalizeInsurance(value: string | undefined): InsuranceType {
+  if (value === "簡易" || value === "なし") return value;
+  return "あり";
+}
 
 export default function QuotesPage() {
   const [sort, setSort] = useState<SortMode>("recommended");
@@ -78,7 +84,12 @@ export default function QuotesPage() {
       },
       rating: sq.rating,
       options: sq.options.map((o) => ({
-        ...o,
+        id: o.id,
+        label: o.label,
+        price: o.price,
+        crew: o.crew,
+        boxes: o.boxes,
+        insurance: normalizeInsurance(o.insurance),
         hint: o.hint || "この見積は動画確認後に作成された見積です。",
       })),
       basePriceMin: Math.min(...sq.options.map((o) => o.price)),
