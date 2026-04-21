@@ -4,11 +4,13 @@ export type StoredVideoMeta = {
   fileType: string;
   uploadedAt: string;
   size: number;
+  stepId?: number;
+  stepTitle?: string;
 };
 
 const DB_NAME = "movis-demo-db";
 const STORE_NAME = "videos";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -26,16 +28,21 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveVideo(file: File): Promise<StoredVideoMeta> {
+export async function saveVideo(
+  file: File,
+  options?: { stepId?: number; stepTitle?: string }
+): Promise<StoredVideoMeta> {
   const db = await openDb();
 
-  const id = `video-${Date.now()}`;
+  const id = `video-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const record = {
     id,
     fileName: file.name,
     fileType: file.type,
     uploadedAt: new Date().toISOString(),
     size: file.size,
+    stepId: options?.stepId,
+    stepTitle: options?.stepTitle,
     blob: file,
   };
 
@@ -56,6 +63,8 @@ export async function saveVideo(file: File): Promise<StoredVideoMeta> {
     fileType: file.type,
     uploadedAt: record.uploadedAt,
     size: file.size,
+    stepId: record.stepId,
+    stepTitle: record.stepTitle,
   };
 }
 
@@ -97,8 +106,15 @@ export async function listVideos(): Promise<StoredVideoMeta[]> {
       fileType: item.fileType,
       uploadedAt: item.uploadedAt,
       size: item.size,
+      stepId: item.stepId,
+      stepTitle: item.stepTitle,
     }))
     .sort((a, b) => (a.uploadedAt < b.uploadedAt ? 1 : -1));
+}
+
+export async function listVideosByStep(stepId: number): Promise<StoredVideoMeta[]> {
+  const all = await listVideos();
+  return all.filter((v) => v.stepId === stepId);
 }
 
 export async function deleteVideo(id: string): Promise<void> {
