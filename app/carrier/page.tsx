@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { getVideoBlob } from "../../lib/videoStore";
+import { getVideoBlob, listVideos, type StoredVideoMeta } from "../../lib/videoStore";
 
 type RequestStatus = "new" | "reviewing" | "quoted";
 
@@ -54,12 +54,10 @@ type ConfirmedOrder = {
   status: string;
 };
 
-type LatestVideoMeta = {
-  id: string;
-  fileName: string;
-  fileType: string;
-  uploadedAt: string;
-  size: number;
+type StepGroup = {
+  stepId: number;
+  stepTitle: string;
+  videos: StoredVideoMeta[];
 };
 
 const initialForm: QuoteForm = {
@@ -131,8 +129,9 @@ export default function CarrierPage() {
   const [selectedId, setSelectedId] = useState<string | null>(mockRequests[0]?.id ?? null);
   const [form, setForm] = useState<QuoteForm>(initialForm);
   const [confirmedOrders, setConfirmedOrders] = useState<ConfirmedOrder[]>([]);
-  const [latestVideoMeta, setLatestVideoMeta] = useState<LatestVideoMeta | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [allVideos, setAllVideos] = useState<StoredVideoMeta[]>([]);
+  const [selectedVideoId, setSelectedVideoId] = useState<string>("");
+  const [selectedVideoUrl, setSelectedVideoUrl] = useState<string>("");
   const [isLoadingVideo, setIsLoadingVideo] = useState(false);
 
   const selectedRequest = useMemo(
@@ -140,54 +139,91 @@ export default function CarrierPage() {
     [requests, selectedId]
   );
 
+  const groupedVideos = useMemo<StepGroup[]>(() => {
+    const map = new Map<number, StepGroup>();
+
+    for (const video of allVideos) {
+      const stepId = video.stepId ?? 0;
+      const stepTitle = video.stepTitle || "ステップ未設定";
+
+      if (!map.has(stepId)) {
+        map.set(stepId, {
+          stepId,
+          stepTitle,
+          videos: [],
+        });
+      }
+
+      map.get(stepId)!.videos.push(video);
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.stepId - b.stepId);
+  }, [allVideos]);
+
+  const totalVideoCount = allVideos.length;
+  const totalStepCount = useMemo(() => {
+    return new Set(allVideos.map((v) => v.stepId).filter((v): v is number => typeof v === "number")).size;
+  }, [allVideos]);
+
   useEffect(() => {
     const savedOrders = JSON.parse(localStorage.getItem("movis_confirmed_orders") || "[]");
     setConfirmedOrders(savedOrders);
 
-    const meta = localStorage.getItem("movis_latest_video_meta");
-    if (meta) {
+    const loadVideos = async () => {
       try {
-        setLatestVideoMeta(JSON.parse(meta));
-      } catch {
-        // noop
+        const videos = await listVideos();
+        setAllVideos(videos);
+
+        if (videos.length > 0) {
+          setSelectedVideoId(videos[0].id);
+        }
+      } catch (error) {
+        console.error(error);
       }
-    }
+    };
+
+    loadVideos();
   }, []);
 
   useEffect(() => {
     let objectUrl = "";
 
-    const loadVideo = async () => {
-      if (!latestVideoMeta?.id) {
-        setVideoUrl("");
+    const loadSelectedVideo = async () => {
+      if (!selectedVideoId) {
+        setSelectedVideoUrl("");
         return;
       }
 
       try {
         setIsLoadingVideo(true);
-        const blob = await getVideoBlob(latestVideoMeta.id);
+        const blob = await getVideoBlob(selectedVideoId);
 
         if (!blob) {
-          setVideoUrl("");
+          setSelectedVideoUrl("");
           return;
         }
 
         objectUrl = URL.createObjectURL(blob);
-        setVideoUrl(objectUrl);
+        setSelectedVideoUrl(objectUrl);
       } catch (error) {
         console.error(error);
-        setVideoUrl("");
+        setSelectedVideoUrl("");
       } finally {
         setIsLoadingVideo(false);
       }
     };
 
-    loadVideo();
+    loadSelectedVideo();
 
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [latestVideoMeta]);
+  }, [selectedVideoId]);
+
+  const selectedVideoMeta = useMemo(
+    () => allVideos.find((v) => v.id === selectedVideoId) ?? null,
+    [allVideos, selectedVideoId]
+  );
 
   const updateForm = (key: keyof QuoteForm, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -290,7 +326,7 @@ export default function CarrierPage() {
                   Movis案件一覧と見積提出
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-muted md:text-base">
-                  ユーザーがアップロードした実動画と条件を確認し、引越会社ごとに日程別の見積を提出します。
+                  ユーザーがアップロードした複数動画と条件を確認し、引越会社ごとに日程別の見積を提出します。
                   発注確定後は、電話番号を含む連携情報が下部に反映されます。
                 </p>
               </div>
@@ -306,11 +342,11 @@ export default function CarrierPage() {
                 <div>
                   <div className="text-sm font-semibold text-navy">ユーザー動画登録状況</div>
                   <div className="mt-2 text-2xl font-bold text-navy">
-                    {latestVideoMeta ? "動画アップロード済み" : "未アップロード"}
+                    {totalVideoCount > 0 ? "動画アップロード済み" : "未アップロード"}
                   </div>
                   <div className="mt-1 text-sm text-muted">
-                    {latestVideoMeta
-                      ? `登録ファイル：${latestVideoMeta.fileName}`
+                    {totalVideoCount > 0
+                      ? `${totalVideoCount}本 / ${totalStepCount}ステップ分の動画が登録されています`
                       : "ユーザーがまだ動画を登録していません"}
                   </div>
                 </div>
@@ -318,12 +354,12 @@ export default function CarrierPage() {
                 <span
                   className={[
                     "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
-                    latestVideoMeta
+                    totalVideoCount > 0
                       ? "border-green-300 bg-green-50 text-green-700"
                       : "border-border bg-white text-muted",
                   ].join(" ")}
                 >
-                  {latestVideoMeta ? "見積確認可能" : "確認待ち"}
+                  {totalVideoCount > 0 ? "見積確認可能" : "確認待ち"}
                 </span>
               </div>
             </div>
@@ -361,17 +397,79 @@ export default function CarrierPage() {
                           <span
                             className={[
                               "inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold",
-                              latestVideoMeta
+                              totalVideoCount > 0
                                 ? "border-green-300 bg-green-50 text-green-700"
                                 : "border-border bg-white text-muted",
                             ].join(" ")}
                           >
-                            {latestVideoMeta ? "動画アップロード済み" : "動画未登録"}
+                            {totalVideoCount > 0
+                              ? `${totalVideoCount}本の動画アップロード済み`
+                              : "動画未登録"}
                           </span>
                         </div>
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-bg p-4">
+                  <div className="text-sm font-semibold text-navy">ステップ別動画一覧</div>
+
+                  {groupedVideos.length === 0 ? (
+                    <div className="mt-3 rounded-xl border border-border bg-white p-4 text-sm text-muted">
+                      まだ動画は登録されていません。
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-4">
+                      {groupedVideos.map((group) => (
+                        <div
+                          key={`${group.stepId}-${group.stepTitle}`}
+                          className="rounded-2xl border border-border bg-white p-4"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-bold text-navy">
+                                {group.stepId > 0 ? `${group.stepId}. ` : ""}
+                                {group.stepTitle}
+                              </div>
+                              <div className="mt-1 text-xs text-muted">
+                                {group.videos.length}本保存済み
+                              </div>
+                            </div>
+
+                            <span className="inline-flex rounded-full border border-green-300 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                              保存済み
+                            </span>
+                          </div>
+
+                          <div className="mt-3 space-y-2">
+                            {group.videos.map((video) => {
+                              const isActive = selectedVideoId === video.id;
+                              return (
+                                <button
+                                  key={video.id}
+                                  onClick={() => setSelectedVideoId(video.id)}
+                                  className={[
+                                    "w-full rounded-xl border px-3 py-3 text-left transition",
+                                    isActive
+                                      ? "border-cyan bg-cyan/10"
+                                      : "border-border bg-bg hover:bg-white",
+                                  ].join(" ")}
+                                >
+                                  <div className="text-sm font-semibold text-navy">
+                                    {video.fileName}
+                                  </div>
+                                  <div className="mt-1 text-xs text-muted">
+                                    約{Math.round((video.size / 1024 / 1024) * 100) / 100} MB
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -399,20 +497,20 @@ export default function CarrierPage() {
                           <div>
                             <div className="text-sm font-semibold text-navy">動画登録状況</div>
                             <div className="mt-1 text-sm text-muted">
-                              {latestVideoMeta
-                                ? "ユーザーの動画登録が完了しています"
+                              {totalVideoCount > 0
+                                ? `${totalVideoCount}本 / ${totalStepCount}ステップ分の動画が登録済みです`
                                 : "まだ動画が登録されていません"}
                             </div>
                           </div>
                           <span
                             className={[
                               "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
-                              latestVideoMeta
+                              totalVideoCount > 0
                                 ? "border-green-300 bg-green-50 text-green-700"
                                 : "border-border bg-white text-muted",
                             ].join(" ")}
                           >
-                            {latestVideoMeta ? "アップロード済み" : "未登録"}
+                            {totalVideoCount > 0 ? "アップロード済み" : "未登録"}
                           </span>
                         </div>
                       </div>
@@ -438,8 +536,8 @@ export default function CarrierPage() {
                           <div>
                             <div className="text-sm font-semibold text-navy">動画確認</div>
                             <div className="mt-1 text-xs text-muted">
-                              {latestVideoMeta
-                                ? `最新動画：${latestVideoMeta.fileName}`
+                              {selectedVideoMeta
+                                ? `選択中：${selectedVideoMeta.stepTitle || "ステップ未設定"} / ${selectedVideoMeta.fileName}`
                                 : "まだ動画はアップロードされていません"}
                             </div>
                           </div>
@@ -447,21 +545,21 @@ export default function CarrierPage() {
                           <span
                             className={[
                               "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
-                              latestVideoMeta
+                              totalVideoCount > 0
                                 ? "border-green-300 bg-green-50 text-green-700"
                                 : "border-border bg-white text-muted",
                             ].join(" ")}
                           >
-                            {latestVideoMeta ? "動画アップロード済み" : "動画未登録"}
+                            {totalVideoCount > 0 ? "複数動画確認可" : "動画未登録"}
                           </span>
                         </div>
 
                         <div className="mt-4 rounded-xl border border-border bg-white p-3">
                           {isLoadingVideo ? (
                             <div className="text-sm text-muted">動画を読み込み中です...</div>
-                          ) : videoUrl ? (
+                          ) : selectedVideoUrl ? (
                             <video
-                              src={videoUrl}
+                              src={selectedVideoUrl}
                               controls
                               className="w-full rounded-lg"
                               style={{ maxHeight: 360 }}
@@ -478,7 +576,7 @@ export default function CarrierPage() {
                     <div className="rounded-2xl border border-border bg-white p-5 shadow-soft">
                       <div className="text-lg font-bold text-navy">見積提出</div>
                       <p className="mt-2 text-sm leading-6 text-muted">
-                        日程別に最大3案まで提示できます。動画を確認したうえで、各社判断で見積を提出してください。
+                        日程別に最大3案まで提示できます。ステップごとの動画を確認したうえで、各社判断で見積を提出してください。
                       </p>
 
                       <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -582,7 +680,7 @@ export default function CarrierPage() {
                       <div className="text-sm font-semibold text-navy">Movisでの役割分担</div>
                       <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
                         <li>・Movis：動画と条件を整理して案件化</li>
-                        <li>・引越会社：動画を見て各社判断で価格提示</li>
+                        <li>・引越会社：ステップごとの動画を見て各社判断で価格提示</li>
                         <li>・発注確定後：電話番号を含む連携情報を受領</li>
                       </ul>
                     </div>
